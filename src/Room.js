@@ -23,10 +23,11 @@ module.exports = class Room {
 
   getProducerListForPeer() {
     let producerList = []
-    this.peers.forEach((peer) => {
+    this.peers.forEach((peer, socketId) => {
       peer.producers.forEach((producer) => {
         producerList.push({
-          producer_id: producer.id
+          producer_id: producer.id,
+          producer_socket_id: socketId
         })
       })
     })
@@ -159,9 +160,32 @@ module.exports = class Room {
   }
 
   toJson() {
+    const peersArray = [...this.peers].map(([socketId, peer]) => {
+      let hasAudio = false
+      let hasVideo = false
+
+      if (peer.producers && peer.producers.forEach) {
+        peer.producers.forEach((producer) => {
+          if (producer.kind === 'audio') hasAudio = true
+          if (producer.kind === 'video') hasVideo = true
+        })
+      }
+
+      return [
+        socketId,
+        {
+          name: peer.name,
+          avatar: peer.avatar || null,
+          isTrainer: !!peer.isTrainer,
+          hasAudio,
+          hasVideo
+        }
+      ]
+    })
+
     return {
       id: this.id,
-      peers: JSON.stringify([...this.peers])
+      peers: JSON.stringify(peersArray)
     }
   }
 }

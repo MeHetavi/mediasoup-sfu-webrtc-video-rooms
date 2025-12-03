@@ -1,7 +1,6 @@
 const mediaType = {
   audio: 'audioType',
-  video: 'videoType',
-  screen: 'screenType'
+  video: 'videoType'
 }
 const _EVENTS = {
   exitRoom: 'exitRoom',
@@ -9,13 +8,11 @@ const _EVENTS = {
   startVideo: 'startVideo',
   stopVideo: 'stopVideo',
   startAudio: 'startAudio',
-  stopAudio: 'stopAudio',
-  startScreen: 'startScreen',
-  stopScreen: 'stopScreen'
+  stopAudio: 'stopAudio'
 }
 
 class RoomClient {
-  constructor(localMediaEl, remoteVideoEl, remoteAudioEl, mediasoupClient, socket, room_id, name, successCallback) {
+  constructor(localMediaEl, remoteVideoEl, remoteAudioEl, mediasoupClient, socket, room_id, name, successCallback, options = {}) {
     this.name = name
     this.localMediaEl = localMediaEl
     this.remoteVideoEl = remoteVideoEl
@@ -33,6 +30,11 @@ class RoomClient {
 
     this.consumers = new Map()
     this.producers = new Map()
+    this.peerCardsById = new Map()
+    this.consumerOwner = new Map()
+    this.localCard = null
+    this.isTrainer = !!options.isTrainer
+    this.profilePic = options.profilePic || null
 
     console.log('Mediasoup client', mediasoupClient)
 
@@ -73,24 +75,24 @@ class RoomClient {
   }
 
   async join(name, room_id) {
-    socket
-      .request('join', {
+    try {
+      const e = await this.socket.request('join', {
         name,
-        room_id
+        room_id,
+        avatar: this.profilePic,
+        isTrainer: this.isTrainer
       })
-      .then(
-        async function (e) {
-          console.log('Joined to room', e)
-          const data = await this.socket.request('getRouterRtpCapabilities')
-          let device = await this.loadDevice(data)
-          this.device = device
-          await this.initTransports(device)
-          this.socket.emit('getProducers')
-        }.bind(this)
-      )
-      .catch((err) => {
-        console.log('Join error:', err)
-      })
+      console.log('Joined to room', e)
+
+      const data = await this.socket.request('getRouterRtpCapabilities')
+      const device = await this.loadDevice(data)
+      this.device = device
+      await this.initTransports(device)
+      await this.initializeParticipants()
+      this.socket.emit('getProducers')
+    } catch (err) {
+      console.log('Join error:', err)
+    }
   }
 
   async loadDevice(routerRtpCapabilities) {
@@ -247,9 +249,32 @@ class RoomClient {
       'newProducers',
       async function (data) {
         console.log('New producers', data)
-        for (let { producer_id } of data) {
-          await this.consume(producer_id)
+        for (let { producer_id, producer_socket_id } of data) {
+          await this.consume(producer_id, producer_socket_id)
         }
+      }.bind(this)
+    )
+
+    // Keep participant cards in sync with join/leave events
+    this.socket.on(
+      'peerJoined',
+      function ({ name, socketId, avatar, isTrainer }) {
+        if (!socketId || !name || name === this.name) return
+        this.createOrGetRemoteCard(socketId, name, avatar, isTrainer)
+      }.bind(this)
+    )
+
+    this.socket.on(
+      'peerLeft',
+      function ({ socketId }) {
+        if (!socketId) return
+        const card = this.peerCardsById.get(socketId)
+        if (card && card.parentNode) {
+          card.parentNode.removeChild(card)
+        }
+        this.peerCardsById.delete(socketId)
+
+        this.updateGridLayout()
       }.bind(this)
     )
 
@@ -264,9 +289,18 @@ class RoomClient {
   //////// MAIN FUNCTIONS /////////////
 
   async produce(type, deviceId = null) {
+    // Ensure device and transports are ready before trying to produce
+    if (!this.device) {
+      console.error('Cannot produce: mediasoup device is not initialized yet')
+      return
+    }
+    if (!this.producerTransport) {
+      console.error('Cannot produce: producer transport is not initialized yet')
+      return
+    }
+
     let mediaConstraints = {}
     let audio = false
-    let screen = false
     switch (type) {
       case mediaType.audio:
         mediaConstraints = {
@@ -296,10 +330,6 @@ class RoomClient {
           }
         }
         break
-      case mediaType.screen:
-        mediaConstraints = false
-        screen = true
-        break
       default:
         return
     }
@@ -314,37 +344,14 @@ class RoomClient {
     console.log('Mediacontraints:', mediaConstraints)
     let stream
     try {
-      stream = screen
-        ? await navigator.mediaDevices.getDisplayMedia()
-        : await navigator.mediaDevices.getUserMedia(mediaConstraints)
+      stream = await navigator.mediaDevices.getUserMedia(mediaConstraints)
       console.log(navigator.mediaDevices.getSupportedConstraints())
 
       const track = audio ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0]
       const params = {
+        // Keep it simple: let the browser/mediasoup decide encodings to avoid
+        // SDP/recv-parameter incompatibility errors in some browsers.
         track
-      }
-      if (!audio && !screen) {
-        params.encodings = [
-          {
-            rid: 'r0',
-            maxBitrate: 100000,
-            //scaleResolutionDownBy: 10.0,
-            scalabilityMode: 'S1T3'
-          },
-          {
-            rid: 'r1',
-            maxBitrate: 300000,
-            scalabilityMode: 'S1T3'
-          },
-          {
-            rid: 'r2',
-            maxBitrate: 900000,
-            scalabilityMode: 'S1T3'
-          }
-        ]
-        params.codecOptions = {
-          videoGoogleStartBitrate: 1000
-        }
       }
       producer = await this.producerTransport.produce(params)
 
@@ -354,13 +361,20 @@ class RoomClient {
 
       let elem
       if (!audio) {
-        elem = document.createElement('video')
+        const card = this.ensureLocalCard()
+        elem = card.querySelector('video')
+        if (!elem) {
+          elem = document.createElement('video')
+          elem.playsinline = false
+          elem.autoplay = true
+          elem.className = 'vid hidden'
+          card.appendChild(elem)
+        }
         elem.srcObject = stream
         elem.id = producer.id
-        elem.playsinline = false
-        elem.autoplay = true
-        elem.className = 'vid'
-        this.localMediaEl.appendChild(elem)
+        elem.classList.remove('hidden')
+        const placeholder = card.querySelector('.participant-placeholder')
+        if (placeholder) placeholder.classList.add('hidden')
         this.handleFS(elem.id)
       }
 
@@ -399,9 +413,6 @@ class RoomClient {
         case mediaType.video:
           this.event(_EVENTS.startVideo)
           break
-        case mediaType.screen:
-          this.event(_EVENTS.startScreen)
-          break
         default:
           return
       }
@@ -410,23 +421,55 @@ class RoomClient {
     }
   }
 
-  async consume(producer_id) {
-    //let info = await this.roomInfo()
+  async consume(producer_id, ownerSocketId = null) {
+    // Forward to extended version so we can attach video into the correct card.
+    return this.consumeForOwner(producer_id, ownerSocketId)
+  }
 
+  /**
+   * Consume a producer and, if it's video, attach it into the appropriate
+   * participant card.
+   */
+  async consumeForOwner(producer_id, ownerSocketId = null) {
     this.getConsumeStream(producer_id).then(
       function ({ consumer, stream, kind }) {
         this.consumers.set(consumer.id, consumer)
 
         let elem
         if (kind === 'video') {
-          elem = document.createElement('video')
-          elem.srcObject = stream
-          elem.id = consumer.id
-          elem.playsinline = false
-          elem.autoplay = true
-          elem.className = 'vid'
-          this.remoteVideoEl.appendChild(elem)
-          this.handleFS(elem.id)
+          let card = null
+          if (ownerSocketId && this.peerCardsById.has(ownerSocketId)) {
+            card = this.peerCardsById.get(ownerSocketId)
+          }
+
+          if (card) {
+            elem = card.querySelector('video')
+            if (!elem) {
+              elem = document.createElement('video')
+              elem.playsinline = false
+              elem.autoplay = true
+              elem.className = 'vid hidden'
+              card.appendChild(elem)
+            }
+            elem.srcObject = stream
+            elem.id = consumer.id
+            elem.classList.remove('hidden')
+            const placeholder = card.querySelector('.participant-placeholder')
+            if (placeholder) placeholder.classList.add('hidden')
+            this.handleFS(elem.id)
+          } else {
+            // Fallback: attach directly if we don't have a card
+            elem = document.createElement('video')
+            elem.srcObject = stream
+            elem.id = consumer.id
+            elem.playsinline = false
+            elem.autoplay = true
+            elem.className = 'vid'
+            this.remoteVideoEl.appendChild(elem)
+            this.handleFS(elem.id)
+          }
+
+          this.consumerOwner.set(consumer.id, ownerSocketId)
         } else {
           elem = document.createElement('audio')
           elem.srcObject = stream
@@ -500,10 +543,20 @@ class RoomClient {
 
     if (type !== mediaType.audio) {
       let elem = document.getElementById(producer_id)
-      elem.srcObject.getTracks().forEach(function (track) {
-        track.stop()
-      })
-      elem.parentNode.removeChild(elem)
+      if (elem && elem.srcObject) {
+        elem.srcObject.getTracks().forEach(function (track) {
+          track.stop()
+        })
+        elem.srcObject = null
+      }
+      if (elem) {
+        elem.classList.add('hidden')
+        const card = elem.parentNode
+        if (card) {
+          const placeholder = card.querySelector('.participant-placeholder')
+          if (placeholder) placeholder.classList.remove('hidden')
+        }
+      }
     }
 
     switch (type) {
@@ -512,9 +565,6 @@ class RoomClient {
         break
       case mediaType.video:
         this.event(_EVENTS.stopVideo)
-        break
-      case mediaType.screen:
-        this.event(_EVENTS.stopScreen)
         break
       default:
         return
@@ -543,12 +593,23 @@ class RoomClient {
 
   removeConsumer(consumer_id) {
     let elem = document.getElementById(consumer_id)
-    elem.srcObject.getTracks().forEach(function (track) {
-      track.stop()
-    })
-    elem.parentNode.removeChild(elem)
+    if (elem && elem.srcObject) {
+      elem.srcObject.getTracks().forEach(function (track) {
+        track.stop()
+      })
+      elem.srcObject = null
+    }
+    if (elem) {
+      elem.classList.add('hidden')
+      const card = elem.parentNode
+      if (card) {
+        const placeholder = card.querySelector('.participant-placeholder')
+        if (placeholder) placeholder.classList.remove('hidden')
+      }
+    }
 
     this.consumers.delete(consumer_id)
+    this.consumerOwner.delete(consumer_id)
   }
 
   exit(offline = false) {
@@ -579,10 +640,171 @@ class RoomClient {
   }
 
   ///////  HELPERS //////////
+  async initializeParticipants() {
+    // Always ensure we have our own card
+    const localCard = this.ensureLocalCard()
+
+    try {
+      const info = await this.roomInfo()
+      if (info && info.peers) {
+        const peersArr = JSON.parse(info.peers)
+        peersArr.forEach(([socketId, peer]) => {
+          if (!peer || !peer.name) return
+          if (peer.name === this.name) {
+            // Map our own socket id to the local card
+            this.peerCardsById.set(socketId, localCard)
+          } else {
+            this.createOrGetRemoteCard(socketId, peer.name, peer.avatar, peer.isTrainer)
+          }
+        })
+      }
+    } catch (e) {
+      console.warn('Failed to initialize participant cards', e)
+    }
+
+    this.updateGridLayout()
+  }
+
+  ensureLocalCard() {
+    if (this.localCard) return this.localCard
+    const card = document.createElement('div')
+    card.className = 'video-card'
+    card.dataset.participantType = 'local'
+
+    const placeholder = document.createElement('div')
+    placeholder.className =
+      'participant-placeholder flex flex-col items-center justify-center text-white text-sm gap-1'
+
+    const avatar = document.createElement('div')
+    avatar.className =
+      'w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-lg font-semibold'
+    if (this.profilePic) {
+      avatar.style.backgroundImage = `url('${this.profilePic}')`
+      avatar.style.backgroundSize = 'cover'
+      avatar.style.backgroundPosition = 'center'
+      avatar.textContent = ''
+    } else {
+      const initial = (this.name && this.name[0] && this.name[0].toUpperCase()) || 'U'
+      avatar.textContent = initial
+    }
+
+    const nameEl = document.createElement('div')
+    nameEl.className = 'font-medium'
+    nameEl.textContent = `${this.name || 'You'} (You)`
+
+    placeholder.appendChild(avatar)
+    placeholder.appendChild(nameEl)
+    card.appendChild(placeholder)
+
+    if (this.isTrainer) {
+      const badge = document.createElement('div')
+      badge.className = 'trainer-badge'
+      badge.textContent = 'Trainer'
+      card.appendChild(badge)
+    }
+
+    // Hidden video element to be used when video is ON
+    const video = document.createElement('video')
+    video.playsinline = false
+    video.autoplay = true
+    video.className = 'vid hidden'
+    card.appendChild(video)
+
+    this.localMediaEl.appendChild(card)
+    this.localCard = card
+
+    // Allow pinning by clicking the card
+    card.addEventListener('click', () => {
+      if (window.setPinnedCard) {
+        window.setPinnedCard(card)
+      }
+    })
+    this.updateGridLayout()
+    return card
+  }
+
+  createOrGetRemoteCard(socketId, name, profilePicUrl = null, isTrainer = false) {
+    if (!socketId) return null
+    if (this.peerCardsById.has(socketId)) {
+      return this.peerCardsById.get(socketId)
+    }
+
+    const card = document.createElement('div')
+    card.className = 'video-card'
+    card.dataset.participantId = socketId
+
+    const placeholder = document.createElement('div')
+    placeholder.className =
+      'participant-placeholder flex flex-col items-center justify-center text-white text-sm gap-1'
+
+    const avatar = document.createElement('div')
+    avatar.className =
+      'w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-lg font-semibold'
+
+    if (profilePicUrl) {
+      avatar.style.backgroundImage = `url('${profilePicUrl}')`
+      avatar.style.backgroundSize = 'cover'
+      avatar.style.backgroundPosition = 'center'
+      avatar.textContent = ''
+    } else {
+      const initial = (name && name[0] && name[0].toUpperCase()) || 'P'
+      avatar.textContent = initial
+    }
+
+    const nameEl = document.createElement('div')
+    nameEl.className = 'font-medium'
+    nameEl.textContent = name || 'Participant'
+
+    placeholder.appendChild(avatar)
+    placeholder.appendChild(nameEl)
+    card.appendChild(placeholder)
+
+    if (isTrainer) {
+      const badge = document.createElement('div')
+      badge.className = 'trainer-badge'
+      badge.textContent = 'Trainer'
+      card.appendChild(badge)
+    }
+
+    // Hidden video element to be used when video is ON
+    const video = document.createElement('video')
+    video.playsinline = false
+    video.autoplay = true
+    video.className = 'vid hidden'
+    card.appendChild(video)
+
+    this.remoteVideoEl.appendChild(card)
+    this.peerCardsById.set(socketId, card)
+
+    // Allow pinning by clicking the card
+    card.addEventListener('click', () => {
+      if (window.setPinnedCard) {
+        window.setPinnedCard(card)
+      }
+    })
+
+    this.updateGridLayout()
+    return card
+  }
 
   async roomInfo() {
     let info = await this.socket.request('getMyRoomInfo')
     return info
+  }
+
+  updateGridLayout() {
+    const grid = this.localMediaEl
+    if (!grid) return
+    const cards = grid.querySelectorAll('.video-card')
+    const count = cards.length
+
+    grid.classList.remove('layout-3', 'layout-4')
+
+    if (count === 3) {
+      grid.classList.add('layout-3')
+    } else if (count === 4) {
+      grid.classList.add('layout-4')
+    }
   }
 
   static get mediaType() {
@@ -610,16 +832,6 @@ class RoomClient {
   }
 
   //////// UTILITY ////////
-
-  copyURL() {
-    let tmpInput = document.createElement('input')
-    document.body.appendChild(tmpInput)
-    tmpInput.value = window.location.href
-    tmpInput.select()
-    document.execCommand('copy')
-    document.body.removeChild(tmpInput)
-    console.log('URL copied to clipboard 👍')
-  }
 
   showDevices() {
     if (!this.isDevicesVisible) {

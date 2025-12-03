@@ -1,7 +1,9 @@
 module.exports = class Peer {
-  constructor(socket_id, name) {
+  constructor(socket_id, name, avatar = null, isTrainer = false) {
     this.id = socket_id
     this.name = name
+    this.avatar = avatar || null
+    this.isTrainer = !!isTrainer
     this.transports = new Map()
     this.consumers = new Map()
     this.producers = new Map()

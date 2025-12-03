@@ -19,6 +19,11 @@ const io = require('socket.io')(httpsServer)
 
 app.use(express.static(path.join(__dirname, '..', 'public')))
 
+// Serve the lobby for any /:room_id URL so users can join that room directly
+app.get('/:room_id', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'))
+})
+
 httpsServer.listen(config.listenPort, () => {
   console.log('Listening on https://' + config.listenIp + ':' + config.listenPort)
 })
@@ -47,9 +52,9 @@ let nextMediasoupWorkerIdx = 0
  */
 let roomList = new Map()
 
-;(async () => {
-  await createWorkers()
-})()
+  ; (async () => {
+    await createWorkers()
+  })()
 
 async function createWorkers() {
   let { numWorkers } = config.mediasoup
@@ -89,10 +94,12 @@ io.on('connection', (socket) => {
     }
   })
 
-  socket.on('join', ({ room_id, name }, cb) => {
+  socket.on('join', ({ room_id, name, avatar, isTrainer }, cb) => {
     console.log('User joined', {
       room_id: room_id,
-      name: name
+      name: name,
+      avatar: avatar,
+      isTrainer: isTrainer
     })
 
     if (!roomList.has(room_id)) {
@@ -101,8 +108,19 @@ io.on('connection', (socket) => {
       })
     }
 
-    roomList.get(room_id).addPeer(new Peer(socket.id, name))
+    roomList.get(room_id).addPeer(new Peer(socket.id, name, avatar, isTrainer))
     socket.room_id = room_id
+
+    // Join a Socket.IO room for easy broadcasting
+    socket.join(room_id)
+
+    // Notify existing peers in the room that someone joined
+    socket.to(room_id).emit('peerJoined', {
+      name,
+      socketId: socket.id,
+      avatar,
+      isTrainer
+    })
 
     cb(roomList.get(room_id).toJson())
   })
@@ -176,8 +194,18 @@ io.on('connection', (socket) => {
   })
 
   socket.on('consume', async ({ consumerTransportId, producerId, rtpCapabilities }, callback) => {
-    //TODO null handling
-    let params = await roomList.get(socket.room_id).consume(socket.id, consumerTransportId, producerId, rtpCapabilities)
+    // handle nulls / failures from Room.consume
+    const params = await roomList.get(socket.room_id).consume(socket.id, consumerTransportId, producerId, rtpCapabilities)
+
+    if (!params) {
+      console.error('Consume failed (can not consume)', {
+        name: `${roomList.get(socket.room_id) && roomList.get(socket.room_id).getPeers().get(socket.id).name}`,
+        producer_id: `${producerId}`
+      })
+      return callback({
+        error: 'can not consume'
+      })
+    }
 
     console.log('Consuming', {
       name: `${roomList.get(socket.room_id) && roomList.get(socket.room_id).getPeers().get(socket.id).name}`,
@@ -203,7 +231,15 @@ io.on('connection', (socket) => {
     })
 
     if (!socket.room_id) return
-    roomList.get(socket.room_id).removePeer(socket.id)
+
+    const room_id = socket.room_id
+    const room = roomList.get(room_id)
+    const name = room && room.getPeers().get(socket.id) && room.getPeers().get(socket.id).name
+
+    // Notify remaining peers that someone left (unexpectedly)
+    socket.to(room_id).emit('peerLeft', { name, socketId: socket.id })
+
+    roomList.get(room_id).removePeer(socket.id)
   })
 
   socket.on('producerClosed', ({ producer_id }) => {
@@ -225,11 +261,18 @@ io.on('connection', (socket) => {
       })
       return
     }
+    const room_id = socket.room_id
+    const room = roomList.get(room_id)
+    const name = room && room.getPeers().get(socket.id) && room.getPeers().get(socket.id).name
+
     // close transports
-    await roomList.get(socket.room_id).removePeer(socket.id)
-    if (roomList.get(socket.room_id).getPeers().size === 0) {
-      roomList.delete(socket.room_id)
+    await room.removePeer(socket.id)
+    if (room.getPeers().size === 0) {
+      roomList.delete(room_id)
     }
+
+    // Notify remaining peers that this participant left voluntarily
+    socket.to(room_id).emit('peerLeft', { name, socketId: socket.id })
 
     socket.room_id = null
 
