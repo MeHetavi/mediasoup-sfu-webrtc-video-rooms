@@ -278,6 +278,45 @@ class RoomClient {
       }.bind(this)
     )
 
+    // Trainer/owner moderation events
+    this.socket.on(
+      'forceMute',
+      function ({ by }) {
+        console.log('Force mute received from', by)
+        // Close local audio producer if present
+        if (this.producerLabel && this.producerLabel.has(mediaType.audio)) {
+          this.closeProducer(mediaType.audio)
+        }
+        if (window.showNotification) {
+          window.showNotification(`${by || 'Trainer'} muted your microphone`)
+        }
+
+        // If the participants list is currently open, refresh it so that
+        // our own mic status updates there as well.
+        try {
+          if (
+            typeof window.openParticipantsModal === 'function' &&
+            typeof participantsModal !== 'undefined' &&
+            !participantsModal.classList.contains('hidden')
+          ) {
+            window.openParticipantsModal()
+          }
+        } catch (e) {
+          console.warn('Failed to refresh participants list after force mute:', e)
+        }
+      }.bind(this)
+    )
+
+    this.socket.on(
+      'requestUnmute',
+      function ({ by }) {
+        console.log('Request unmute received from', by)
+        if (window.showNotification) {
+          window.showNotification(`${by || 'Trainer'} asked you to unmute your microphone`)
+        }
+      }.bind(this)
+    )
+
     this.socket.on(
       'disconnect',
       function () {

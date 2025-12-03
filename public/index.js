@@ -323,14 +323,17 @@ async function checkOwnershipAndOngoing(roomId, displayName) {
     const userId = extractUserId(profile)
 
     if (userId) {
-      const ownershipUrl = buildApiUrl(`/sessions/${encodeURIComponent(roomId)}/${encodeURIComponent(userId)}/check-ownership`)
+      const ownershipUrl = buildApiUrl(
+        `/sessions/${encodeURIComponent(roomId)}/${encodeURIComponent(userId)}/check-ownership`
+      )
       const ownership = await safeJsonFetch(ownershipUrl, {
         method: 'GET',
         headers: authHeaders(true)
       })
 
       if (ownership) {
-        const { is_owner, is_trainer_owner, is_institute_owner } = ownership
+        const payload = ownership.data || ownership
+        const { is_owner, is_trainer_owner, is_institute_owner } = payload || {}
         if (is_owner || is_trainer_owner || is_institute_owner) {
           isTrainerFlag = '1'
           return { allowed: true, sessionInfo: null }
@@ -353,10 +356,10 @@ async function checkOwnershipAndOngoing(roomId, displayName) {
 
   const isOngoing = ongoing.ongoing === true || ongoing.is_ongoing === true
 
-  if (!isOngoing) {
-    showNotification('Session not started yet.')
-    return { allowed: false, sessionInfo: null }
-  }
+  // if (!isOngoing) {
+  //   showNotification('Session not started yet.')
+  //   return { allowed: false, sessionInfo: null }
+  // }
 
   sessionInfo = ongoing
   return { allowed: true, sessionInfo }
@@ -812,10 +815,11 @@ async function openParticipantsModal() {
         empty.textContent = 'No other participants in the room.'
         listEl.appendChild(empty)
       } else {
-        peersArr.forEach(([, peer]) => {
+        peersArr.forEach(([socketId, peer]) => {
           const name = (peer && peer.name) || 'Participant'
           const hasAudio = !!(peer && peer.hasAudio)
           const hasVideo = !!(peer && peer.hasVideo)
+          const isPeerTrainer = !!(peer && peer.isTrainer)
 
           const item = document.createElement('div')
           item.className = 'flex items-center justify-between gap-2'
@@ -858,6 +862,28 @@ async function openParticipantsModal() {
           item.appendChild(left)
           item.appendChild(status)
 
+          // If current user is trainer/owner, allow moderation controls on non-trainers
+          if (rc && rc.isTrainer && !isPeerTrainer && socketId) {
+            const actions = document.createElement('div')
+            actions.className = 'flex items-center gap-2 ml-2'
+
+            const muteButton = document.createElement('button')
+            muteButton.type = 'button'
+            muteButton.className =
+              'px-2 py-1 rounded text-xs bg-emerald-600 text-white hover:bg-emerald-700 transition-colors'
+
+            if (hasAudio) {
+              muteButton.textContent = 'Mute'
+              muteButton.onclick = () => trainerMuteParticipant(socketId, name)
+            } else {
+              muteButton.textContent = 'Ask to unmute'
+              muteButton.onclick = () => trainerRequestUnmute(socketId, name)
+            }
+
+            actions.appendChild(muteButton)
+            item.appendChild(actions)
+          }
+
           listEl.appendChild(item)
         })
       }
@@ -876,6 +902,70 @@ async function openParticipantsModal() {
   }
 
   reveal(participantsModal)
+}
+
+async function trainerMuteParticipant(socketId, name) {
+  if (!socketId) return
+  try {
+    const res = await socket.request('moderateAudio', {
+      targetSocketId: socketId,
+      action: 'mute'
+    })
+    if (res && res.error) {
+      console.error('Mute failed:', res.error)
+      showNotification(`Failed to mute ${name}`)
+      return
+    }
+    showNotification(`Muted ${name}'s microphone`)
+
+    // Refresh participants list so mic state/icons and button label update
+    try {
+      if (
+        typeof openParticipantsModal === 'function' &&
+        typeof participantsModal !== 'undefined' &&
+        !participantsModal.classList.contains('hidden')
+      ) {
+        await openParticipantsModal()
+      }
+    } catch (e) {
+      console.warn('Failed to refresh participants after mute:', e)
+    }
+  } catch (e) {
+    console.error('Mute request failed:', e)
+    showNotification(`Failed to mute ${name}`)
+  }
+}
+
+async function trainerRequestUnmute(socketId, name) {
+  if (!socketId) return
+  try {
+    const res = await socket.request('moderateAudio', {
+      targetSocketId: socketId,
+      action: 'requestUnmute'
+    })
+    if (res && res.error) {
+      console.error('Request unmute failed:', res.error)
+      showNotification(`Failed to send unmute request to ${name}`)
+      return
+    }
+    showNotification(`Asked ${name} to unmute`)
+
+    // Refresh participants list so mic state/icons and button label update
+    try {
+      if (
+        typeof openParticipantsModal === 'function' &&
+        typeof participantsModal !== 'undefined' &&
+        !participantsModal.classList.contains('hidden')
+      ) {
+        await openParticipantsModal()
+      }
+    } catch (e) {
+      console.warn('Failed to refresh participants after unmute request:', e)
+    }
+  } catch (e) {
+    console.error('Request unmute failed:', e)
+    showNotification(`Failed to send unmute request to ${name}`)
+  }
 }
 
 function closeParticipantsModal() {

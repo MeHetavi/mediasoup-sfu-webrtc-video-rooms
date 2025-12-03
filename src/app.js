@@ -216,6 +216,58 @@ io.on('connection', (socket) => {
     callback(params)
   })
 
+  // Trainer/owner moderation: allow them to mute or request unmute for others
+  socket.on('moderateAudio', ({ targetSocketId, action }, callback) => {
+    const cb = typeof callback === 'function' ? callback : () => { }
+
+    if (!socket.room_id || !roomList.has(socket.room_id)) {
+      return cb({ error: 'not in a room' })
+    }
+
+    const room_id = socket.room_id
+    const room = roomList.get(room_id)
+    const peers = room.getPeers()
+    const requester = peers.get(socket.id)
+
+    if (!requester || !requester.isTrainer) {
+      return cb({ error: 'not authorized' })
+    }
+
+    if (!targetSocketId || !peers.has(targetSocketId)) {
+      return cb({ error: 'target not found' })
+    }
+
+    const target = peers.get(targetSocketId)
+
+    switch (action) {
+      case 'mute':
+        // Ask the target client to close its own audio producer
+        io.to(targetSocketId).emit('forceMute', {
+          by: requester.name || 'Trainer'
+        })
+        console.log('Trainer muted participant audio', {
+          trainer: requester.name,
+          target: target.name
+        })
+        cb({ success: true })
+        break
+      case 'requestUnmute':
+        // Politely ask the target to unmute themselves
+        io.to(targetSocketId).emit('requestUnmute', {
+          by: requester.name || 'Trainer'
+        })
+        console.log('Trainer requested participant to unmute', {
+          trainer: requester.name,
+          target: target.name
+        })
+        cb({ success: true })
+        break
+      default:
+        cb({ error: 'unknown action' })
+        break
+    }
+  })
+
   socket.on('resume', async (data, callback) => {
     await consumer.resume()
     callback()
