@@ -21,67 +21,75 @@
 </head>
 
 <body class="min-h-screen flex flex-col">
-    <!-- Top lobby bar with preview -->
-    <div class="w-full flex flex-col items-center gap-3 px-4 pt-3">
-        <div id="login" class="bg-white/80 rounded-xl shadow-md px-4 py-3 flex flex-wrap items-center gap-3 text-sm">
-            <span class="flex items-center gap-1">
-                <i class="fas fa-server"></i>
-                <span>Room:</span>
-                <input id="roomidInput" value="123" type="text"
-                    class="border border-gray-300 rounded px-2 py-1 bg-white/80 focus:outline-none focus:ring focus:ring-blue-400" />
-            </span>
-            <!--<button id="createRoom" onclick="createRoom(roomid.value)" label="createRoom">Create Room</button>-->
-            <span class="flex items-center gap-1">
-                <i class="fas fa-user"></i>
-                <span>User:</span>
-                <input id="nameInput" value="user" type="text"
-                    class="border border-gray-300 rounded px-2 py-1 bg-white/80 focus:outline-none focus:ring focus:ring-blue-400" />
-            </span>
-            <button id="joinButton" onclick="joinRoom(nameInput.value, roomidInput.value)"
-                class="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
-                <i class="fas fa-sign-in-alt"></i>
-                <span>Join</span>
-            </button>
-        </div>
+    <!-- Top lobby area: video preview on the left, details on the right -->
+    <div class="w-full flex justify-center px-4 pt-4">
+        <div class="w-full max-w-6xl flex flex-col md:flex-row gap-6 items-stretch">
+            <!-- Left: live video preview -->
+            <div class="w-full md:w-1/2 flex justify-center">
+                <div id="lobbyPreview" class="lobby-preview hidden w-full">
+                    <div class="lobby-video-wrapper">
+                        <video id="lobbyVideoPreview" autoplay muted playsinline></video>
+                    </div>
+                    <div class="lobby-status">
+                        <span id="lobbyStatusText">Checking your camera and microphone…</span>
+                    </div>
+                    <div class="lobby-controls">
+                        <div class="lobby-buttons">
+                            <button id="lobbyToggleAudio" type="button"
+                                class="control-button text-xs px-3 py-1.5 rounded-md flex items-center gap-1">
+                                <i class="fas fa-microphone"></i>
+                                <span>Mute</span>
+                            </button>
+                            <button id="lobbyToggleVideo" type="button"
+                                class="control-button text-xs px-3 py-1.5 rounded-md flex items-center gap-1">
+                                <i class="fas fa-video"></i>
+                                <span>Stop video</span>
+                            </button>
+                        </div>
+                        <div class="lobby-device-selects">
+                            <label class="lobby-device-label">
+                                <span>Mic</span>
+                                <select id="lobbyAudioSelect" class="lobby-select"></select>
+                            </label>
+                            <label class="lobby-device-label">
+                                <span>Camera</span>
+                                <select id="lobbyVideoSelect" class="lobby-select"></select>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        <!-- Logged-in user info (from /me/profile) -->
-        <div id="lobbyUserInfo" class="lobby-user hidden">
-            <div id="lobbyUserAvatar" class="lobby-user-avatar"></div>
-            <div class="lobby-user-text">
-                <div id="lobbyUserName" class="lobby-user-name"></div>
-            </div>
-        </div>
-
-        <!-- Lobby media preview -->
-        <div id="lobbyPreview" class="lobby-preview hidden">
-            <div class="lobby-video-wrapper">
-                <video id="lobbyVideoPreview" autoplay muted playsinline></video>
-            </div>
-            <div class="lobby-status">
-                <span id="lobbyStatusText">Checking your camera and microphone…</span>
-            </div>
-            <div class="lobby-controls">
-                <div class="lobby-buttons">
-                    <button id="lobbyToggleAudio" type="button"
-                        class="control-button text-xs px-3 py-1.5 rounded-md flex items-center gap-1">
-                        <i class="fas fa-microphone"></i>
-                        <span>Mute</span>
-                    </button>
-                    <button id="lobbyToggleVideo" type="button"
-                        class="control-button text-xs px-3 py-1.5 rounded-md flex items-center gap-1">
-                        <i class="fas fa-video"></i>
-                        <span>Stop video</span>
+            <!-- Right: room / name / profile info -->
+            <div class="w-full md:w-1/2 flex flex-col gap-3">
+                <div id="login"
+                    class="bg-white/80 rounded-xl shadow-md px-4 py-3 flex flex-wrap items-center gap-3 text-sm">
+                    <span class="flex items-center gap-1">
+                        <i class="fas fa-server"></i>
+                        <span>Room:</span>
+                        <input id="roomidInput" value="123" type="text"
+                            class="border border-gray-300 rounded px-2 py-1 bg-white/80 focus:outline-none focus:ring focus:ring-blue-400" />
+                    </span>
+                    <!--<button id="createRoom" onclick="createRoom(roomid.value)" label="createRoom">Create Room</button>-->
+                    <span class="flex items-center gap-1">
+                        <i class="fas fa-user"></i>
+                        <span>User:</span>
+                        <input id="nameInput" value="user" type="text"
+                            class="border border-gray-300 rounded px-2 py-1 bg-white/80 focus:outline-none focus:ring focus:ring-blue-400" />
+                    </span>
+                    <button id="joinButton" onclick="joinRoom(nameInput.value, roomidInput.value)"
+                        class="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Join</span>
                     </button>
                 </div>
-                <div class="lobby-device-selects">
-                    <label class="lobby-device-label">
-                        <span>Mic</span>
-                        <select id="lobbyAudioSelect" class="lobby-select"></select>
-                    </label>
-                    <label class="lobby-device-label">
-                        <span>Camera</span>
-                        <select id="lobbyVideoSelect" class="lobby-select"></select>
-                    </label>
+
+                <!-- Logged-in user info (from /me/profile) -->
+                <div id="lobbyUserInfo" class="lobby-user hidden">
+                    <div id="lobbyUserAvatar" class="lobby-user-avatar"></div>
+                    <div class="lobby-user-text">
+                        <div id="lobbyUserName" class="lobby-user-name"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -97,62 +105,50 @@
     </div>
 
     <!-- Bottom control panel -->
-    <div class="fixed inset-x-0 bottom-0 px-4 py-3 flex justify-center z-50 bottom-bar">
-        <div id="control" class="hidden flex flex-wrap items-center justify-center gap-2 text-sm">
-            <button id="exitButton"
-                class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
-                onclick="leaveAndExit()">
-                <i class="fas fa-arrow-left"></i>
-                <span>Exit</span>
-            </button>
-            <button id="devicesButton"
-                class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
-                onclick="rc.showDevices()">
-                <i class="fas fa-cogs"></i>
-                <span>Devices</span>
-            </button>
+    <div id="control" class="hidden fixed inset-x-0 bottom-0 px-4 py-2 flex justify-center z-50 bottom-bar">
+        <div class=" flex flex-wrap items-center justify-center gap-2 text-sm">
+
+
+            <div class="hidden inline-flex items-center gap-2" id="audioControls">
+                <button id="startAudioButton"
+                    class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                    onclick="rc.produce(RoomClient.mediaType.audio, audioSelect.value)">
+                    <img src="/media/audio_off.svg" alt="Audio off" class="audio-icon" />
+                </button>
+                <button id="stopAudioButton"
+                    class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                    onclick="rc.closeProducer(RoomClient.mediaType.audio)">
+                    <img src="/media/audio_on.svg" alt="Audio on" class="audio-icon" />
+                </button>
+                <select id="audioSelect" class="device-select"></select>
+            </div>
+            <div class="hidden inline-flex items-center gap-2" id="videoControls">
+                <button id="startVideoButton"
+                    class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                    onclick="rc.produce(RoomClient.mediaType.video, videoSelect.value)">
+                    <img src="/media/video_off.svg" alt="Video off" class="video-icon" />
+                </button>
+                <button id="stopVideoButton"
+                    class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                    onclick="rc.closeProducer(RoomClient.mediaType.video)">
+                    <img src="/media/video_on.svg" alt="Video on" class="video-icon" />
+                </button>
+                <select id="videoSelect" class="device-select"></select>
+            </div>
             <button id="participantsButton"
                 class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                 onclick="openParticipantsModal()">
-                <i class="fas fa-users"></i>
-                <span>Participants</span>
+                <!-- <i class="fas fa-users"></i> -->
+                <!-- <span>Participants</span> -->
+                <img src="/media/participants.svg" alt="Participants" class="participants-icon" />
             </button>
-            <button id="startAudioButton"
-                class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
-                onclick="rc.produce(RoomClient.mediaType.audio, audioSelect.value)">
-                <i class="fas fa-volume-up"></i>
-                <span>Open audio</span>
+            <button id="exitButton"
+                class="hidden inline-flex items-center bg-red-500 gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                onclick="leaveAndExit()">
+                <!-- <i class="fas fa-arrow-left"></i> -->
+                <img src="/media/exit.svg" alt="Exit" class="exit-icon" />
+                <!-- <span>Exit</span> -->
             </button>
-            <button id="stopAudioButton"
-                class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
-                onclick="rc.closeProducer(RoomClient.mediaType.audio)">
-                <i class="fas fa-volume-up"></i>
-                <span>Close audio</span>
-            </button>
-            <button id="startVideoButton"
-                class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
-                onclick="rc.produce(RoomClient.mediaType.video, videoSelect.value)">
-                <i class="fas fa-camera"></i>
-                <span>Open video</span>
-            </button>
-            <button id="stopVideoButton"
-                class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
-                onclick="rc.closeProducer(RoomClient.mediaType.video)">
-                <i class="fas fa-camera"></i>
-                <span>Close video</span>
-            </button>
-            <div id="devicesList" class="hidden flex items-center gap-2 text-white">
-                <span class="flex items-center gap-1">
-                    <i class="fas fa-microphone"></i>
-                    <span>Audio:</span>
-                    <select id="audioSelect" class="form-select w-auto text-black"></select>
-                </span>
-                <span class="flex items-center gap-1">
-                    <i class="fas fa-video"></i>
-                    <span>Video:</span>
-                    <select id="videoSelect" class="form-select w-auto text-black"></select>
-                </span>
-            </div>
         </div>
     </div>
 

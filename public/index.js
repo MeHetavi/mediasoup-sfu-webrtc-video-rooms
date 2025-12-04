@@ -651,10 +651,17 @@ function roomOpen() {
   reveal(startVideoButton)
   hide(stopVideoButton)
   reveal(exitButton)
-  reveal(devicesButton)
   reveal(participantsButton)
   reveal(control)
   reveal(videoMedia)
+
+  // Show audio and video controls with dropdowns
+  if (typeof audioControls !== 'undefined') {
+    reveal(audioControls)
+  }
+  if (typeof videoControls !== 'undefined') {
+    reveal(videoControls)
+  }
 
   // Warm up audio once so that producing video first does not hit
   // browser SDP/recv-parameter quirks. We immediately close the
@@ -703,12 +710,39 @@ function addListeners() {
   })
   rc.on(RoomClient.EVENTS.exitRoom, () => {
     hide(control)
-    hide(devicesList)
     hide(participantsModal)
     hide(videoMedia)
-    hide(devicesButton)
+    if (typeof audioControls !== 'undefined') {
+      hide(audioControls)
+    }
+    if (typeof videoControls !== 'undefined') {
+      hide(videoControls)
+    }
     reveal(login)
   })
+
+  // Handle device selection changes
+  if (typeof audioSelect !== 'undefined') {
+    audioSelect.addEventListener('change', async (e) => {
+      const deviceId = e.target.value
+      // If audio is currently active, restart with new device
+      if (rc && stopAudioButton && !stopAudioButton.classList.contains('hidden')) {
+        await rc.closeProducer(RoomClient.mediaType.audio)
+        await rc.produce(RoomClient.mediaType.audio, deviceId)
+      }
+    })
+  }
+
+  if (typeof videoSelect !== 'undefined') {
+    videoSelect.addEventListener('change', async (e) => {
+      const deviceId = e.target.value
+      // If video is currently active, restart with new device
+      if (rc && stopVideoButton && !stopVideoButton.classList.contains('hidden')) {
+        await rc.closeProducer(RoomClient.mediaType.video)
+        await rc.produce(RoomClient.mediaType.video, deviceId)
+      }
+    })
+  }
 }
 
 async function leaveAndExit() {

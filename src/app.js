@@ -18,6 +18,7 @@ const httpsServer = https.createServer(options, app)
 const io = require('socket.io')(httpsServer)
 
 app.use(express.static(path.join(__dirname, '..', 'public')))
+app.use('/media', express.static(path.join(__dirname, '..', 'media')))
 
 // Serve the lobby for any /:room_id URL so users can join that room directly
 app.get('/:room_id', (req, res) => {
