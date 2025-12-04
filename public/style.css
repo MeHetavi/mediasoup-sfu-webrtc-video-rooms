@@ -31,9 +31,6 @@ body {
 }
 
 
-.control-button:hover {
-  background-color: #245846c3;
-}
 
 .exit-icon {
   width: 20px;
@@ -41,16 +38,9 @@ body {
   object-fit: contain;
 }
 
-.video-icon {
-  width: 30px;
-  height: 30px;
-  object-fit: contain;
-}
-
-.audio-icon {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
+.control-button i {
+  font-size: 1.25rem;
+  color: white;
 }
 
 .device-select {

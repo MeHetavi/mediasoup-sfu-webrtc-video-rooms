@@ -113,12 +113,12 @@
                 <button id="startAudioButton"
                     class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                     onclick="rc.produce(RoomClient.mediaType.audio, audioSelect.value)">
-                    <img src="/media/audio_off.svg" alt="Audio off" class="audio-icon" />
+                    <i class="fas fa-microphone-slash"></i>
                 </button>
                 <button id="stopAudioButton"
                     class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                     onclick="rc.closeProducer(RoomClient.mediaType.audio)">
-                    <img src="/media/audio_on.svg" alt="Audio on" class="audio-icon" />
+                    <i class="fas fa-microphone"></i>
                 </button>
                 <select id="audioSelect" class="device-select"></select>
             </div>
@@ -126,21 +126,19 @@
                 <button id="startVideoButton"
                     class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                     onclick="rc.produce(RoomClient.mediaType.video, videoSelect.value)">
-                    <img src="/media/video_off.svg" alt="Video off" class="video-icon" />
+                    <i class="fas fa-video-slash"></i>
                 </button>
                 <button id="stopVideoButton"
                     class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                     onclick="rc.closeProducer(RoomClient.mediaType.video)">
-                    <img src="/media/video_on.svg" alt="Video on" class="video-icon" />
+                    <i class="fas fa-video"></i>
                 </button>
                 <select id="videoSelect" class="device-select"></select>
             </div>
             <button id="participantsButton"
                 class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                 onclick="openParticipantsModal()">
-                <!-- <i class="fas fa-users"></i> -->
-                <!-- <span>Participants</span> -->
-                <img src="/media/participants.svg" alt="Participants" class="participants-icon" />
+                <i class="fas fa-users"></i>
             </button>
             <button id="exitButton"
                 class="hidden inline-flex items-center bg-red-500 gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
