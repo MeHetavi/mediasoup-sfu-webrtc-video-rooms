@@ -274,7 +274,27 @@ class RoomClient {
         }
         this.peerCardsById.delete(socketId)
 
-        this.updateGridLayout()
+        // Add smooth fade-out animation
+        if (card) {
+          card.classList.add('removing')
+          setTimeout(() => {
+            if (card.parentNode) {
+              card.parentNode.removeChild(card)
+            }
+            // Update layout after removal
+            if (window.updateGridLayout) {
+              window.updateGridLayout()
+            } else {
+              this.updateGridLayout()
+            }
+          }, 300)
+        } else {
+          if (window.updateGridLayout) {
+            window.updateGridLayout()
+          } else {
+            this.updateGridLayout()
+          }
+        }
       }.bind(this)
     )
 
@@ -832,6 +852,13 @@ class RoomClient {
   }
 
   updateGridLayout() {
+    // Use the global updateGridLayout function if available
+    if (window.updateGridLayout) {
+      window.updateGridLayout()
+      return
+    }
+
+    // Fallback to simple layout
     const grid = this.localMediaEl
     if (!grid) return
     const cards = grid.querySelectorAll('.video-card')

@@ -131,6 +131,11 @@ window.attachStream = function (id, stream) {
   }
   video.classList.remove('hidden')
   if (placeholder) placeholder.classList.add('hidden')
+
+  // Update layout when video starts
+  setTimeout(() => {
+    window.updateGridLayout()
+  }, 100)
 }
 
 // Detach the video stream and show avatar/name instead
@@ -147,28 +152,150 @@ window.detachStream = function (id) {
   video.srcObject = null
   video.classList.add('hidden')
   if (placeholder) placeholder.classList.remove('hidden')
+
+  // Update layout when video stops
+  setTimeout(() => {
+    window.updateGridLayout()
+  }, 100)
 }
 
-// Recalculate layout for 1, 2, 3, 4, or many participants
+// Screen size detection
+function getScreenSize() {
+  const width = window.innerWidth
+  if (width <= 640) return 'mobile'
+  if (width <= 768) return 'tablet'
+  if (width <= 1024) return 'small-desktop'
+  return 'large-desktop'
+}
+
+// Get participant count (excluding pinned)
+function getParticipantCount() {
+  const grid = getGridContainer()
+  if (!grid) return 0
+  const pinnedContainer = pinnedContainerEl()
+  const pinnedCards = pinnedContainer && !pinnedContainer.classList.contains('hidden')
+    ? pinnedContainer.querySelectorAll('.video-card').length
+    : 0
+  const allCards = grid.querySelectorAll('.video-card').length
+  return allCards - pinnedCards
+}
+
+// Recalculate layout based on screen size and participant count
 window.updateGridLayout = function (count) {
   const grid = getGridContainer()
   if (!grid) return
+
   const cards = Array.from(grid.querySelectorAll('.video-card'))
-  const n = typeof count === 'number' ? count : cards.length
+  const n = typeof count === 'number' ? count : getParticipantCount()
+  const screenSize = getScreenSize()
+  const pinnedContainer = pinnedContainerEl()
+  const hasPinned = pinnedContainer && !pinnedContainer.classList.contains('hidden') && pinnedContainer.querySelector('.video-card')
 
-  grid.classList.remove('layout-3', 'layout-4')
+  // Remove all layout classes
+  grid.classList.remove(
+    'layout-1', 'layout-2', 'layout-3', 'layout-4',
+    'layout-5', 'layout-6', 'layout-7', 'layout-8', 'layout-9',
+    'layout-10', 'layout-11', 'layout-12', 'layout-13', 'layout-14', 'layout-15', 'layout-16',
+    'layout-17plus', 'layout-5plus', 'layout-5plus-scroll',
+    'layout-pinned', 'layout-pinned-mobile'
+  )
 
-  if (n === 3) {
-    grid.classList.add('layout-3')
-  } else if (n === 4) {
-    grid.classList.add('layout-4')
+  // Handle pinned video layouts
+  if (hasPinned) {
+    if (screenSize === 'mobile') {
+      grid.classList.add('layout-pinned-mobile')
+    } else {
+      grid.classList.add('layout-pinned')
+    }
+    return
   }
-  // 1, 2, 5+ fall back to auto-fit/minmax grid
+
+  // Auto-pin on mobile if 5+ participants
+  if (screenSize === 'mobile' && n > 4) {
+    const firstCard = cards[0]
+    if (firstCard && window.setPinnedCard) {
+      window.setPinnedCard(firstCard)
+      return
+    }
+  }
+
+  // Apply layout based on screen size and participant count
+  if (screenSize === 'mobile') {
+    // Mobile layouts
+    if (n === 1 || n === 2) {
+      grid.classList.add(n === 1 ? 'layout-1' : 'layout-2')
+    } else if (n === 3 || n === 4) {
+      grid.classList.add('layout-4')
+    } else {
+      // 5+ participants: pinned + scrollable
+      grid.classList.add('layout-5plus')
+      // Create scrollable container if it doesn't exist
+      let scrollContainer = grid.querySelector('.layout-5plus-scroll')
+      if (!scrollContainer) {
+        scrollContainer = document.createElement('div')
+        scrollContainer.className = 'layout-5plus-scroll'
+        // Move all cards except first to scroll container
+        cards.slice(1).forEach(card => {
+          scrollContainer.appendChild(card)
+        })
+        grid.appendChild(scrollContainer)
+      }
+    }
+  } else if (screenSize === 'tablet') {
+    // Tablet layouts
+    if (n === 1) {
+      grid.classList.add('layout-1')
+    } else if (n === 2) {
+      grid.classList.add('layout-2')
+    } else if (n === 3 || n === 4) {
+      grid.classList.add('layout-4')
+    } else {
+      grid.classList.add('layout-5plus')
+    }
+  } else if (screenSize === 'small-desktop') {
+    // Small desktop layouts
+    if (n === 1) {
+      grid.classList.add('layout-1')
+    } else if (n === 2) {
+      grid.classList.add('layout-2')
+    } else if (n === 3) {
+      grid.classList.add('layout-3')
+    } else if (n === 4) {
+      grid.classList.add('layout-4')
+    } else {
+      grid.classList.add('layout-5plus')
+    }
+  } else {
+    // Large desktop layouts
+    if (n === 1) {
+      grid.classList.add('layout-1')
+    } else if (n === 2) {
+      grid.classList.add('layout-2')
+    } else if (n === 3) {
+      grid.classList.add('layout-3')
+    } else if (n === 4) {
+      grid.classList.add('layout-4')
+    } else if (n === 5 || n === 6) {
+      grid.classList.add(n === 5 ? 'layout-5' : 'layout-6')
+    } else if (n === 7 || n === 8) {
+      grid.classList.add(n === 7 ? 'layout-7' : 'layout-8')
+    } else if (n === 9) {
+      grid.classList.add('layout-9')
+    } else if (n >= 10 && n <= 16) {
+      grid.classList.add(`layout-${n}`)
+    } else {
+      grid.classList.add('layout-17plus')
+    }
+  }
 }
 
-// Reflow on resize
+// Reflow on resize with debounce
+let resizeTimeout
 window.addEventListener('resize', () => {
-  window.updateGridLayout()
+  clearTimeout(resizeTimeout)
+  resizeTimeout = setTimeout(() => {
+    window.updateGridLayout()
+  }, 150)
 })
 
 // === API helpers ===
@@ -242,44 +369,59 @@ async function fetchProfileIfNeeded() {
 async function initLobbyUserInfo() {
   try {
     const profile = await fetchProfileIfNeeded()
-    if (!profile) return
 
-    const name =
-      profile.name ||
-      profile.full_name ||
-      profile.display_name ||
-      profile.username ||
-      profile.email ||
-      ''
+    let name = ''
+    let avatarUrl = null
 
-    const avatarUrl =
-      profile.profile_pic ||
-      profile.profile_picture ||
-      profile.avatar_url ||
-      profile.avatar ||
-      null
+    if (profile) {
+      name =
+        profile.name ||
+        profile.full_name ||
+        profile.display_name ||
+        profile.username ||
+        profile.email ||
+        ''
+
+      avatarUrl =
+        profile.profile_pic ||
+        profile.profile_picture ||
+        profile.avatar_url ||
+        profile.avatar ||
+        null
+    }
 
     if (name && typeof nameInput !== 'undefined') {
       nameInput.value = name
     }
 
-    if (typeof lobbyUserInfo !== 'undefined' && typeof lobbyUserName !== 'undefined') {
-      lobbyUserName.textContent = name || 'User'
-      const avatarEl = typeof lobbyUserAvatar !== 'undefined' ? lobbyUserAvatar : null
-      if (avatarEl) {
-        if (avatarUrl) {
-          avatarEl.style.backgroundImage = `url('${avatarUrl}')`
-          avatarEl.textContent = ''
-        } else {
-          avatarEl.style.backgroundImage = ''
-          const initial = name && name[0] ? name[0].toUpperCase() : 'U'
-          avatarEl.textContent = initial
-        }
+    if (typeof lobbyUserName !== 'undefined') {
+      // Update the display name (username format)
+      const username = name ? `@${name.toLowerCase().replace(/\s+/g, '')}` : '@user'
+      lobbyUserName.textContent = username
+    }
+
+    const avatarEl = typeof lobbyUserAvatar !== 'undefined' ? lobbyUserAvatar : null
+    if (avatarEl) {
+      if (avatarUrl) {
+        avatarEl.style.backgroundImage = `url('${avatarUrl}')`
+        avatarEl.textContent = ''
+      } else {
+        avatarEl.style.backgroundImage = ''
+        const initial = name && name[0] ? name[0].toUpperCase() : 'U'
+        avatarEl.textContent = initial
       }
-      lobbyUserInfo.classList.remove('hidden')
+    }
+
+    // Always show join card
+    if (typeof lobbyJoinCard !== 'undefined') {
+      lobbyJoinCard.classList.remove('hidden')
     }
   } catch (e) {
     console.error('Failed to init lobby user info:', e)
+    // Show join card even if profile fetch fails
+    if (typeof lobbyJoinCard !== 'undefined') {
+      lobbyJoinCard.classList.remove('hidden')
+    }
   }
 }
 
@@ -421,9 +563,24 @@ async function trackLeave(sessionId, displayName, attendanceId, useKeepalive = f
 async function initLobbyPreview() {
   if (lobbyPreviewStream || typeof lobbyVideoPreview === 'undefined') return
 
+  // Show lobby preview and placeholder initially
+  if (typeof lobbyPreview !== 'undefined') {
+    lobbyPreview.classList.remove('hidden')
+  }
+  if (typeof lobbyVideoPlaceholder !== 'undefined') {
+    lobbyVideoPlaceholder.classList.remove('hidden')
+    const placeholderText = typeof lobbyVideoPlaceholderText !== 'undefined' ? lobbyVideoPlaceholderText : null
+    if (placeholderText) {
+      placeholderText.textContent = 'Camera is off'
+    }
+  }
+  if (typeof lobbyJoinCard !== 'undefined') {
+    lobbyJoinCard.classList.remove('hidden')
+  }
+
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    if (typeof lobbyStatusText !== 'undefined') {
-      lobbyStatusText.textContent = 'Camera/microphone preview not supported in this browser.'
+    if (typeof lobbyVideoPlaceholderText !== 'undefined') {
+      lobbyVideoPlaceholderText.textContent = 'Camera/microphone preview not supported in this browser.'
     }
     return
   }
@@ -435,21 +592,51 @@ async function initLobbyPreview() {
     })
     lobbyPreviewStream = stream
 
-    lobbyVideoPreview.srcObject = stream
-    lobbyVideoPreview.muted = true
-    if (typeof lobbyPreview !== 'undefined') {
-      lobbyPreview.classList.remove('hidden')
-    }
-    if (typeof lobbyStatusText !== 'undefined') {
-      lobbyStatusText.textContent = 'You look great. Ready to join the call?'
+    // Check if video track exists
+    const videoTracks = stream.getVideoTracks()
+    if (videoTracks.length > 0 && videoTracks[0].enabled) {
+      lobbyVideoPreview.srcObject = stream
+      lobbyVideoPreview.muted = true
+      if (typeof lobbyVideoPreview !== 'undefined') {
+        lobbyVideoPreview.classList.remove('hidden')
+      }
+      if (typeof lobbyVideoPlaceholder !== 'undefined') {
+        lobbyVideoPlaceholder.classList.add('hidden')
+      }
+    } else {
+      // No video track or video is disabled
+      if (typeof lobbyVideoPlaceholder !== 'undefined') {
+        lobbyVideoPlaceholder.classList.remove('hidden')
+        if (typeof lobbyVideoPlaceholderText !== 'undefined') {
+          lobbyVideoPlaceholderText.textContent = 'Camera is off'
+        }
+      }
+      if (typeof lobbyVideoPreview !== 'undefined') {
+        lobbyVideoPreview.classList.add('hidden')
+      }
     }
 
     // Populate device dropdowns now that we have permission
     populateLobbyDevices()
   } catch (err) {
     console.error('Lobby preview failed:', err)
-    if (typeof lobbyStatusText !== 'undefined') {
-      lobbyStatusText.textContent = 'Unable to access camera/microphone. Check your permissions.'
+    if (typeof lobbyVideoPlaceholder !== 'undefined') {
+      lobbyVideoPlaceholder.classList.remove('hidden')
+      const placeholderText = typeof lobbyVideoPlaceholderText !== 'undefined' ? lobbyVideoPlaceholderText : null
+      if (placeholderText) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          placeholderText.textContent = 'Camera/microphone access denied. Please allow access to continue.'
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          placeholderText.textContent = 'No camera found. Please connect a camera device.'
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          placeholderText.textContent = 'Camera is being used by another application.'
+        } else {
+          placeholderText.textContent = 'Unable to access camera. Please check your settings.'
+        }
+      }
+    }
+    if (typeof lobbyVideoPreview !== 'undefined') {
+      lobbyVideoPreview.classList.add('hidden')
     }
   }
 }
@@ -464,6 +651,9 @@ async function populateLobbyDevices() {
     if (typeof lobbyVideoSelect !== 'undefined') {
       lobbyVideoSelect.innerHTML = ''
     }
+    if (typeof lobbySpeakerSelect !== 'undefined') {
+      lobbySpeakerSelect.innerHTML = ''
+    }
 
     devices.forEach((device) => {
       if (device.kind === 'audioinput' && typeof lobbyAudioSelect !== 'undefined') {
@@ -477,6 +667,12 @@ async function populateLobbyDevices() {
         opt.value = device.deviceId
         opt.textContent = device.label || 'Camera'
         lobbyVideoSelect.appendChild(opt)
+      }
+      if (device.kind === 'audiooutput' && typeof lobbySpeakerSelect !== 'undefined') {
+        const opt = document.createElement('option')
+        opt.value = device.deviceId
+        opt.textContent = device.label || 'Speaker'
+        lobbySpeakerSelect.appendChild(opt)
       }
     })
   } catch (e) {
@@ -493,33 +689,74 @@ function toggleLobbyAudio() {
   })
   if (typeof lobbyToggleAudio !== 'undefined') {
     const icon = lobbyToggleAudio.querySelector('i')
-    const label = lobbyToggleAudio.querySelector('span')
-    if (!enabled) {
-      icon.className = 'fas fa-microphone-slash'
-      label.textContent = 'Unmute'
-    } else {
-      icon.className = 'fas fa-microphone'
-      label.textContent = 'Mute'
+    if (icon) {
+      if (!enabled) {
+        icon.className = 'fas fa-microphone-slash'
+      } else {
+        icon.className = 'fas fa-microphone'
+      }
     }
   }
 }
 
 function toggleLobbyVideo() {
-  if (!lobbyPreviewStream) return
+  if (!lobbyPreviewStream) {
+    // No stream available, show error
+    if (typeof lobbyVideoPlaceholder !== 'undefined') {
+      lobbyVideoPlaceholder.classList.remove('hidden')
+      if (typeof lobbyVideoPlaceholderText !== 'undefined') {
+        lobbyVideoPlaceholderText.textContent = 'Camera is off'
+      }
+    }
+    if (typeof lobbyVideoPreview !== 'undefined') {
+      lobbyVideoPreview.classList.add('hidden')
+    }
+    return
+  }
+
   const videoTracks = lobbyPreviewStream.getVideoTracks()
   const enabled = videoTracks.some((t) => t.enabled)
   videoTracks.forEach((t) => {
     t.enabled = !enabled
   })
+
   if (typeof lobbyToggleVideo !== 'undefined') {
     const icon = lobbyToggleVideo.querySelector('i')
-    const label = lobbyToggleVideo.querySelector('span')
-    if (!enabled) {
-      icon.className = 'fas fa-video-slash'
-      label.textContent = 'Start video'
-    } else {
-      icon.className = 'fas fa-video'
-      label.textContent = 'Stop video'
+    if (icon) {
+      if (!enabled) {
+        icon.className = 'fas fa-video-slash'
+        if (typeof lobbyVideoPreview !== 'undefined') {
+          lobbyVideoPreview.classList.add('hidden')
+        }
+        if (typeof lobbyVideoPlaceholder !== 'undefined') {
+          lobbyVideoPlaceholder.classList.remove('hidden')
+          if (typeof lobbyVideoPlaceholderText !== 'undefined') {
+            lobbyVideoPlaceholderText.textContent = 'Camera is off'
+          }
+        }
+      } else {
+        icon.className = 'fas fa-video'
+        // Check if video track is actually available
+        if (videoTracks.length > 0 && videoTracks[0].readyState === 'live') {
+          if (typeof lobbyVideoPreview !== 'undefined') {
+            lobbyVideoPreview.classList.remove('hidden')
+          }
+          if (typeof lobbyVideoPlaceholder !== 'undefined') {
+            lobbyVideoPlaceholder.classList.add('hidden')
+          }
+        } else {
+          // Video track not available
+          if (typeof lobbyVideoPlaceholder !== 'undefined') {
+            lobbyVideoPlaceholder.classList.remove('hidden')
+            if (typeof lobbyVideoPlaceholderText !== 'undefined') {
+              lobbyVideoPlaceholderText.textContent = 'No video available'
+            }
+          }
+          if (typeof lobbyVideoPreview !== 'undefined') {
+            lobbyVideoPreview.classList.add('hidden')
+          }
+        }
+      }
     }
   }
 }
@@ -552,6 +789,38 @@ async function refreshLobbyStream() {
 document.addEventListener('DOMContentLoaded', () => {
   initLobbyPreview()
   initLobbyUserInfo()
+
+  // Add error handler for video element
+  if (typeof lobbyVideoPreview !== 'undefined') {
+    lobbyVideoPreview.addEventListener('error', () => {
+      if (typeof lobbyVideoPlaceholder !== 'undefined') {
+        lobbyVideoPlaceholder.classList.remove('hidden')
+        if (typeof lobbyVideoPlaceholderText !== 'undefined') {
+          lobbyVideoPlaceholderText.textContent = 'Video failed to load'
+        }
+      }
+      if (typeof lobbyVideoPreview !== 'undefined') {
+        lobbyVideoPreview.classList.add('hidden')
+      }
+    })
+
+    lobbyVideoPreview.addEventListener('loadedmetadata', () => {
+      // Video loaded successfully
+      const videoTracks = lobbyPreviewStream?.getVideoTracks() || []
+      if (videoTracks.length === 0 || !videoTracks[0].enabled) {
+        if (typeof lobbyVideoPlaceholder !== 'undefined') {
+          lobbyVideoPlaceholder.classList.remove('hidden')
+          if (typeof lobbyVideoPlaceholderText !== 'undefined') {
+            lobbyVideoPlaceholderText.textContent = 'Camera is off'
+          }
+        }
+        if (typeof lobbyVideoPreview !== 'undefined') {
+          lobbyVideoPreview.classList.add('hidden')
+        }
+      }
+    })
+  }
+
   if (typeof lobbyToggleAudio !== 'undefined') {
     lobbyToggleAudio.addEventListener('click', toggleLobbyAudio)
   }
@@ -570,7 +839,40 @@ document.addEventListener('DOMContentLoaded', () => {
       refreshLobbyStream()
     })
   }
+  if (typeof lobbySpeakerSelect !== 'undefined') {
+    lobbySpeakerSelect.addEventListener('change', (e) => {
+      const deviceId = e.target.value
+      setAudioOutputDevice(deviceId)
+    })
+  }
 })
+
+// Set audio output device for all audio elements
+async function setAudioOutputDevice(deviceId) {
+  if (!deviceId) return
+
+  try {
+    // Set sink for all audio elements in the page
+    const audioElements = document.querySelectorAll('audio')
+    for (const audio of audioElements) {
+      if (audio.setSinkId) {
+        await audio.setSinkId(deviceId)
+      }
+    }
+
+    // Also set for remote audio container if it exists
+    if (typeof remoteAudios !== 'undefined') {
+      const remoteAudioElements = remoteAudios.querySelectorAll('audio')
+      for (const audio of remoteAudioElements) {
+        if (audio.setSinkId) {
+          await audio.setSinkId(deviceId)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to set audio output device:', err)
+  }
+}
 
 async function joinRoom(name, room_id) {
   if (rc && rc.isOpen()) {
@@ -645,7 +947,15 @@ async function joinRoom(name, room_id) {
 }
 
 function roomOpen() {
-  hide(login)
+  // Hide lobby elements
+  if (typeof lobbyJoinCard !== 'undefined') {
+    hide(lobbyJoinCard)
+  }
+  if (typeof lobbyPreview !== 'undefined') {
+    hide(lobbyPreview)
+  }
+
+  // Show room controls
   reveal(startAudioButton)
   hide(stopAudioButton)
   reveal(startVideoButton)
@@ -718,7 +1028,13 @@ function addListeners() {
     if (typeof videoControls !== 'undefined') {
       hide(videoControls)
     }
-    reveal(login)
+    // Show lobby elements
+    if (typeof lobbyJoinCard !== 'undefined') {
+      reveal(lobbyJoinCard)
+    }
+    if (typeof lobbyPreview !== 'undefined') {
+      reveal(lobbyPreview)
+    }
   })
 
   // Handle device selection changes
@@ -770,6 +1086,10 @@ window.setPinnedCard = function (card) {
     pinnedContainer.classList.add('hidden')
     grid.appendChild(card)
     pinnedCard = null
+    // Update layout when unpinning
+    setTimeout(() => {
+      window.updateGridLayout()
+    }, 100)
     return
   }
 
@@ -782,6 +1102,11 @@ window.setPinnedCard = function (card) {
   pinnedContainer.appendChild(card)
   pinnedContainer.classList.remove('hidden')
   pinnedCard = card
+
+  // Update layout when pinning
+  setTimeout(() => {
+    window.updateGridLayout()
+  }, 100)
 }
 
 function pinnedContainerEl() {
