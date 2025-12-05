@@ -18,6 +18,11 @@ body {
   /* Tiles fill their grid cell */
   justify-items: stretch;
   align-items: stretch;
+  /* Ensure containers fit within parent */
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 
 .hidden {
@@ -447,27 +452,44 @@ body {
 
 /* Main video area uses remaining height above fixed bottom bar; no overlap */
 .main-video-area {
-  flex: none;
-  height: calc(100vh - 72px);
-  /* 72px = .bottom-bar height */
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
+  /* Account for bottom bar height (approximately 72px) */
+  height: calc(100vh - 80px);
+  max-height: calc(100vh - 80px);
 }
 
 .main-video-area #videoMedia {
   flex: 1 1 auto;
-  height: 100%;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .main-video-area .containers {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  width: 100%;
   height: 100%;
 }
 
 /* ============================================
    COMPREHENSIVE LAYOUT SYSTEM
    ============================================ */
+
+/* Base video grid container - ensure all layouts fit within parent */
+#videoGrid {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
 
 /* Base video card styling with transitions */
 .video-card {
@@ -484,6 +506,11 @@ body {
   transform: scale(0.95);
   animation: cardFadeIn 0.4s ease forwards;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Ensure video cards fit within their grid cells */
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 @keyframes cardFadeIn {
@@ -519,11 +546,16 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
 }
 
 #pinnedContainer .video-card {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 /* Mobile: ≤ 640px */
@@ -556,12 +588,15 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   #videoGrid.layout-5plus .video-card:first-child {
     flex: 0 0 40%;
-    max-height: 40vh;
+    max-height: 40%;
     min-height: 180px;
+    min-height: 0;
   }
 
   #videoGrid.layout-5plus .video-card:not(:first-child) {
@@ -569,6 +604,7 @@ body {
     width: 200px;
     min-width: 200px;
     height: 150px;
+    min-height: 0;
   }
 
   /* Scrollable row for 5+ participants */
@@ -579,13 +615,15 @@ body {
     overflow-y: hidden;
     gap: 8px;
     padding: 8px;
-    height: calc(60vh - 16px);
+    flex: 1;
+    min-height: 0;
   }
 
   #videoGrid.layout-5plus-scroll .video-card {
     flex-shrink: 0;
     width: 200px;
     height: 150px;
+    min-height: 0;
   }
 
   /* Pinned layout on mobile */
@@ -593,12 +631,16 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   #videoGrid.layout-pinned-mobile #pinnedContainer {
     flex: 0 0 40%;
-    max-height: 40vh;
+    max-height: 40%;
     min-height: 180px;
+    min-height: 0;
+    overflow: hidden;
   }
 
   #videoGrid.layout-pinned-mobile .containers {
@@ -609,12 +651,14 @@ body {
     overflow-y: hidden;
     gap: 8px;
     padding: 8px;
+    min-height: 0;
   }
 
   #videoGrid.layout-pinned-mobile .containers .video-card {
     flex-shrink: 0;
     width: 200px;
     height: 150px;
+    min-height: 0;
   }
 }
 
@@ -650,10 +694,15 @@ body {
     display: grid;
     grid-template-columns: 1fr 300px;
     gap: 10px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   #videoGrid.layout-pinned #pinnedContainer {
     grid-column: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   #videoGrid.layout-pinned .containers {
@@ -662,6 +711,7 @@ body {
     flex-direction: column;
     overflow-y: auto;
     gap: 10px;
+    min-height: 0;
   }
 }
 
@@ -711,6 +761,9 @@ body {
     display: grid;
     grid-template-columns: 1fr 300px;
     gap: 10px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 }
 
@@ -802,12 +855,16 @@ body {
     grid-template-columns: 1fr 300px;
     gap: 10px;
     height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   #videoGrid.layout-pinned #pinnedContainer {
     grid-column: 1;
     width: 100%;
     height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   #videoGrid.layout-pinned .containers {
@@ -817,10 +874,12 @@ body {
     overflow-y: auto;
     gap: 10px;
     max-height: 100%;
+    min-height: 0;
   }
 
   #videoGrid.layout-pinned .containers .video-card {
     width: 100%;
     aspect-ratio: 16 / 9;
+    min-height: 0;
   }
 }
