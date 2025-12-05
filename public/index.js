@@ -961,8 +961,10 @@ function roomOpen() {
   reveal(startVideoButton)
   hide(stopVideoButton)
   reveal(exitButton)
+  hide(lobbyContainer)
   reveal(participantsButton)
   reveal(control)
+  reveal(mainVideoAreaContainer)
   reveal(videoMedia)
 
   // Show audio and video controls with dropdowns
@@ -1062,6 +1064,8 @@ function addListeners() {
 }
 
 async function leaveAndExit() {
+  hide(mainVideoAreaContainer)
+  reveal(lobbyContainer)
   // Track leave (non-blocking)
   try {
     await trackLeave(currentSessionId, currentDisplayName, currentAttendanceId, false)
