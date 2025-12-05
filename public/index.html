@@ -50,14 +50,14 @@
                         <div class="flex">
 
                             <button id="lobbyToggleAudio" type="button" class="lobby-control-btn">
-                                <i class="fas fa-microphone-slash"></i>
+                                <img src="/mic_off.svg" alt="Microphone" class="lobby-icon" id="lobbyMicIcon" />
                             </button>
                             <select id="lobbyAudioSelect" class="lobby-device-dropdown bg-[#1b4332]/50"></select>
                         </div>
                         <div class="flex">
 
                             <button id="lobbyToggleVideo" type="button" class="lobby-control-btn">
-                                <i class="fas fa-video-slash"></i>
+                                <img src="/camera_off.svg" alt="Camera" class="lobby-icon" id="lobbyCameraIcon" />
                             </button>
                             <select id="lobbyVideoSelect" class="lobby-device-dropdown bg-[#1b4332]/50"></select>
                         </div>
@@ -95,28 +95,31 @@
 
     <!-- Main video area -->
     <div id="mainVideoAreaContainer" class="hidden w-full px-4 main-video-area">
+        <!-- Fullscreen toggle button -->
+        <button id="fullscreenButton" class="fullscreen-toggle-btn hidden" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+            <i id="fullscreenIcon" class="fas fa-expand"></i>
+        </button>
         <div id="videoMedia" class="hidden space-y-4">
             <div id="pinnedContainer" class="hidden"></div>
             <div id="videoGrid" class="containers"></div>
             <div id="remoteAudios"></div>
         </div>
-    </div>
-
-    <!-- Bottom control panel -->
-    <div id="control" class="hidden fixed inset-x-0 bottom-0 px-4 py-2 flex justify-center z-50 bottom-bar">
-        <div class=" flex flex-wrap items-center justify-center gap-2 text-sm">
+        
+        <!-- Bottom control panel (moved inside for fullscreen visibility) -->
+        <div id="control" class="hidden fixed left-1/2 bottom-8 -translate-x-1/2 z-50 bottom-bar">
+        <div class="flex items-center justify-center gap-2 text-sm">
 
 
             <div class="hidden inline-flex items-center gap-2" id="audioControls">
                 <button id="startAudioButton"
                     class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                     onclick="rc.produce(RoomClient.mediaType.audio, audioSelect.value)">
-                    <i class="fas fa-microphone-slash"></i>
+                    <img src="/mic_off.svg" alt="Microphone" class="control-icon" />
                 </button>
                 <button id="stopAudioButton"
                     class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                     onclick="rc.closeProducer(RoomClient.mediaType.audio)">
-                    <i class="fas fa-microphone"></i>
+                    <img src="/mic_on.svg" alt="Microphone" class="control-icon" />
                 </button>
                 <select id="audioSelect" class="device-select"></select>
             </div>
@@ -124,27 +127,26 @@
                 <button id="startVideoButton"
                     class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                     onclick="rc.produce(RoomClient.mediaType.video, videoSelect.value)">
-                    <i class="fas fa-video-slash"></i>
+                    <img src="/camera_off.svg" alt="Camera" class="control-icon" />
                 </button>
                 <button id="stopVideoButton"
                     class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                     onclick="rc.closeProducer(RoomClient.mediaType.video)">
-                    <i class="fas fa-video"></i>
+                    <img src="/camera_on.svg" alt="Camera" class="control-icon" />
                 </button>
                 <select id="videoSelect" class="device-select"></select>
             </div>
             <button id="participantsButton"
                 class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                 onclick="openParticipantsModal()">
-                <i class="fas fa-users"></i>
+                <img src="/participants.svg" alt="Participants" class="control-icon" />
             </button>
             <button id="exitButton"
                 class="hidden inline-flex items-center bg-red-500 gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
                 onclick="leaveAndExit()">
-                <!-- <i class="fas fa-arrow-left"></i> -->
-                <img src="/media/exit.svg" alt="Exit" class="exit-icon" />
-                <!-- <span>Exit</span> -->
+                <img src="/exit.svg" alt="Exit" class="exit-icon" />
             </button>
+        </div>
         </div>
     </div>
 

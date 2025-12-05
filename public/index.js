@@ -101,17 +101,60 @@ window.createUserCard = function (id, name, avatar) {
   const video = document.createElement('video')
   video.playsinline = true
   video.autoplay = true
+  video.muted = true // Ensure muted to prevent audio issues
+  video.controls = false
+  video.disablePictureInPicture = true
+  video.setAttribute('playsinline', 'true')
+  video.setAttribute('webkit-playsinline', 'true')
   video.className = 'vid hidden'
+  
+  // Prevent video from opening browser's video player
+  // CSS pointer-events: none will make clicks pass through to card
+  // But add additional prevention just in case
+  video.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    return false
+  })
+  
+  // Prevent context menu and double-click on video
+  video.addEventListener('contextmenu', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    return false
+  })
+  
+  video.addEventListener('dblclick', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    return false
+  })
+  
   card.appendChild(video)
 
   grid.appendChild(card)
 
-  // Allow pinning
-  card.addEventListener('click', () => {
-    if (window.setPinnedCard) {
-      window.setPinnedCard(card)
-    }
-  })
+  // Click functionality disabled - will be implemented later
+  // Prevent any click actions on the card and all child elements
+  const preventAllInteractions = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.stopImmediatePropagation()
+    return false
+  }
+  
+  // Prevent all interaction events on the card
+  card.addEventListener('click', preventAllInteractions, true)
+  card.addEventListener('dblclick', preventAllInteractions, true)
+  card.addEventListener('mousedown', preventAllInteractions, true)
+  card.addEventListener('mouseup', preventAllInteractions, true)
+  card.addEventListener('touchstart', preventAllInteractions, true)
+  card.addEventListener('touchend', preventAllInteractions, true)
+  card.addEventListener('touchcancel', preventAllInteractions, true)
+  
+  // Make card non-interactive via CSS
+  card.style.pointerEvents = 'none'
+  card.style.cursor = 'default'
 
   window.updateGridLayout()
 }
@@ -210,14 +253,14 @@ window.updateGridLayout = function (count) {
     return
   }
 
-  // Auto-pin on mobile if 5+ participants
-  if (screenSize === 'mobile' && n > 4) {
-    const firstCard = cards[0]
-    if (firstCard && window.setPinnedCard) {
-      window.setPinnedCard(firstCard)
-      return
-    }
-  }
+  // Auto-pin on mobile disabled - will be implemented later
+  // if (screenSize === 'mobile' && n > 4) {
+  //   const firstCard = cards[0]
+  //   if (firstCard && window.setPinnedCard) {
+  //     window.setPinnedCard(firstCard)
+  //     return
+  //   }
+  // }
 
   // Apply layout based on screen size and participant count
   if (screenSize === 'mobile') {
@@ -616,6 +659,24 @@ async function initLobbyPreview() {
       }
     }
 
+    // Set initial icon states based on track status
+    const audioTracks = stream.getAudioTracks()
+    const hasAudio = audioTracks.length > 0 && audioTracks[0].enabled
+    if (typeof lobbyToggleAudio !== 'undefined') {
+      const audioIcon = lobbyToggleAudio.querySelector('img') || document.getElementById('lobbyMicIcon')
+      if (audioIcon) {
+        audioIcon.src = hasAudio ? '/mic_on.svg' : '/mic_off.svg'
+      }
+    }
+
+    const hasVideo = videoTracks.length > 0 && videoTracks[0].enabled
+    if (typeof lobbyToggleVideo !== 'undefined') {
+      const videoIcon = lobbyToggleVideo.querySelector('img') || document.getElementById('lobbyCameraIcon')
+      if (videoIcon) {
+        videoIcon.src = hasVideo ? '/camera_on.svg' : '/camera_off.svg'
+      }
+    }
+
     // Populate device dropdowns now that we have permission
     populateLobbyDevices()
   } catch (err) {
@@ -688,12 +749,12 @@ function toggleLobbyAudio() {
     t.enabled = !enabled
   })
   if (typeof lobbyToggleAudio !== 'undefined') {
-    const icon = lobbyToggleAudio.querySelector('i')
+    const icon = lobbyToggleAudio.querySelector('img') || document.getElementById('lobbyMicIcon')
     if (icon) {
       if (!enabled) {
-        icon.className = 'fas fa-microphone-slash'
+        icon.src = '/mic_off.svg'
       } else {
-        icon.className = 'fas fa-microphone'
+        icon.src = '/mic_on.svg'
       }
     }
   }
@@ -721,10 +782,10 @@ function toggleLobbyVideo() {
   })
 
   if (typeof lobbyToggleVideo !== 'undefined') {
-    const icon = lobbyToggleVideo.querySelector('i')
+    const icon = lobbyToggleVideo.querySelector('img') || document.getElementById('lobbyCameraIcon')
     if (icon) {
       if (!enabled) {
-        icon.className = 'fas fa-video-slash'
+        icon.src = '/camera_off.svg'
         if (typeof lobbyVideoPreview !== 'undefined') {
           lobbyVideoPreview.classList.add('hidden')
         }
@@ -735,7 +796,7 @@ function toggleLobbyVideo() {
           }
         }
       } else {
-        icon.className = 'fas fa-video'
+        icon.src = '/camera_on.svg'
         // Check if video track is actually available
         if (videoTracks.length > 0 && videoTracks[0].readyState === 'live') {
           if (typeof lobbyVideoPreview !== 'undefined') {
@@ -779,6 +840,45 @@ async function refreshLobbyStream() {
     lobbyPreviewStream = stream
     if (typeof lobbyVideoPreview !== 'undefined') {
       lobbyVideoPreview.srcObject = stream
+    }
+
+    // Update icon states after stream refresh
+    const audioTracks = stream.getAudioTracks()
+    const hasAudio = audioTracks.length > 0 && audioTracks[0].enabled
+    if (typeof lobbyToggleAudio !== 'undefined') {
+      const audioIcon = lobbyToggleAudio.querySelector('img') || document.getElementById('lobbyMicIcon')
+      if (audioIcon) {
+        audioIcon.src = hasAudio ? '/mic_on.svg' : '/mic_off.svg'
+      }
+    }
+
+    const videoTracks = stream.getVideoTracks()
+    const hasVideo = videoTracks.length > 0 && videoTracks[0].enabled
+    if (typeof lobbyToggleVideo !== 'undefined') {
+      const videoIcon = lobbyToggleVideo.querySelector('img') || document.getElementById('lobbyCameraIcon')
+      if (videoIcon) {
+        videoIcon.src = hasVideo ? '/camera_on.svg' : '/camera_off.svg'
+      }
+    }
+
+    // Update video preview visibility
+    if (hasVideo && videoTracks[0].readyState === 'live') {
+      if (typeof lobbyVideoPreview !== 'undefined') {
+        lobbyVideoPreview.classList.remove('hidden')
+      }
+      if (typeof lobbyVideoPlaceholder !== 'undefined') {
+        lobbyVideoPlaceholder.classList.add('hidden')
+      }
+    } else {
+      if (typeof lobbyVideoPlaceholder !== 'undefined') {
+        lobbyVideoPlaceholder.classList.remove('hidden')
+        if (typeof lobbyVideoPlaceholderText !== 'undefined') {
+          lobbyVideoPlaceholderText.textContent = 'Camera is off'
+        }
+      }
+      if (typeof lobbyVideoPreview !== 'undefined') {
+        lobbyVideoPreview.classList.add('hidden')
+      }
     }
   } catch (e) {
     console.error('Failed to refresh lobby stream with selected devices:', e)
@@ -966,6 +1066,12 @@ function roomOpen() {
   reveal(control)
   reveal(mainVideoAreaContainer)
   reveal(videoMedia)
+  
+  // Show fullscreen button
+  const fullscreenButton = document.getElementById('fullscreenButton')
+  if (fullscreenButton) {
+    fullscreenButton.classList.remove('hidden')
+  }
 
   // Show audio and video controls with dropdowns
   if (typeof audioControls !== 'undefined') {
@@ -1061,9 +1167,106 @@ function addListeners() {
       }
     })
   }
+
+  // Listen for fullscreen changes to update icon
+  document.addEventListener('fullscreenchange', updateFullscreenIcon)
+  document.addEventListener('webkitfullscreenchange', updateFullscreenIcon)
+  document.addEventListener('mozfullscreenchange', updateFullscreenIcon)
+  document.addEventListener('MSFullscreenChange', updateFullscreenIcon)
+  
+  // Add mobile-friendly touch handler for fullscreen button
+  const fullscreenButton = document.getElementById('fullscreenButton')
+  if (fullscreenButton) {
+    // Remove onclick and add proper event listeners for better mobile support
+    fullscreenButton.onclick = null
+    fullscreenButton.addEventListener('click', toggleFullscreen)
+    fullscreenButton.addEventListener('touchend', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      toggleFullscreen()
+    })
+  }
+}
+
+// Fullscreen toggle function
+function toggleFullscreen() {
+  const container = document.getElementById('mainVideoAreaContainer')
+  const fullscreenIcon = document.getElementById('fullscreenIcon')
+  
+  if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+    // Enter fullscreen
+    try {
+      if (container.requestFullscreen) {
+        container.requestFullscreen()
+      } else if (container.webkitRequestFullscreen) {
+        // For iOS Safari
+        container.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT)
+      } else if (container.webkitEnterFullscreen) {
+        // Alternative for older iOS
+        container.webkitEnterFullscreen()
+      } else if (container.mozRequestFullScreen) {
+        container.mozRequestFullScreen()
+      } else if (container.msRequestFullscreen) {
+        container.msRequestFullscreen()
+      }
+    } catch (error) {
+      console.error('Error entering fullscreen:', error)
+    }
+    
+    if (fullscreenIcon) {
+      fullscreenIcon.className = 'fas fa-compress'
+    }
+  } else {
+    // Exit fullscreen
+    try {
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen()
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen()
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen()
+      }
+    } catch (error) {
+      console.error('Error exiting fullscreen:', error)
+    }
+    
+    if (fullscreenIcon) {
+      fullscreenIcon.className = 'fas fa-expand'
+    }
+  }
+}
+
+function updateFullscreenIcon() {
+  const fullscreenIcon = document.getElementById('fullscreenIcon')
+  const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement)
+  
+  if (fullscreenIcon) {
+    fullscreenIcon.className = isFullscreen ? 'fas fa-compress' : 'fas fa-expand'
+  }
 }
 
 async function leaveAndExit() {
+  // Exit fullscreen if active
+  if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+    if (document.exitFullscreen) {
+      document.exitFullscreen()
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen()
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen()
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen()
+    }
+  }
+  
+  // Hide fullscreen button
+  const fullscreenButton = document.getElementById('fullscreenButton')
+  if (fullscreenButton) {
+    fullscreenButton.classList.add('hidden')
+  }
+  
   hide(mainVideoAreaContainer)
   reveal(lobbyContainer)
   // Track leave (non-blocking)
