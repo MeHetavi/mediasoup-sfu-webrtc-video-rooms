@@ -35,8 +35,8 @@
     </div>
 
     <!-- Top lobby area: video preview on the left, details on the right -->
-    <div id="lobbyContainer" class="w-full h-full justify-center items-center flex justify-center">
-        <div class="w-full max-w-6xl flex flex-col md:flex-row gap-6 items-stretch">
+    <div id="lobbyContainer" class="w-full min-h-screen flex justify-center items-start md:items-center px-4 py-4 md:py-6 md:py-8 overflow-y-auto">
+        <div class="w-full max-w-6xl flex flex-col md:flex-row gap-4 md:gap-6 items-stretch pb-4 md:pb-0">
             <!-- Left: live video preview -->
             <div class="w-full md:w-1/2 flex justify-center">
                 <div id="lobbyPreview" class="lobby-preview hidden w-full">
@@ -72,8 +72,8 @@
             </div>
 
             <!-- Right: user info and join -->
-            <div class="w-full md:w-1/2 h-fit flex justify-center">
-                <div id="lobbyJoinCard" class="lobby-join-card hidden">
+            <div class="w-full md:w-1/2 h-fit flex justify-center px-2 md:px-0">
+                <div id="lobbyJoinCard" class="lobby-join-card hidden w-full">
                     <h2 class="lobby-join-title">Ready to join?</h2>
                     <div id="lobbyUserInfo" class="lobby-user-info">
                         <div id="lobbyUserAvatar" class="lobby-user-avatar-large"></div>
