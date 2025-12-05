@@ -134,29 +134,43 @@ window.createUserCard = function (id, name, avatar) {
 
   grid.appendChild(card)
 
-  // Click functionality disabled - will be implemented later
-  // Prevent any click actions on the card and all child elements
-  const preventAllInteractions = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    e.stopImmediatePropagation()
-    return false
-  }
+  // Make card interactive for pinning
+  card.style.cursor = 'pointer'
   
-  // Prevent all interaction events on the card
-  card.addEventListener('click', preventAllInteractions, true)
-  card.addEventListener('dblclick', preventAllInteractions, true)
-  card.addEventListener('mousedown', preventAllInteractions, true)
-  card.addEventListener('mouseup', preventAllInteractions, true)
-  card.addEventListener('touchstart', preventAllInteractions, true)
-  card.addEventListener('touchend', preventAllInteractions, true)
-  card.addEventListener('touchcancel', preventAllInteractions, true)
+  // Add pin icon button
+  addPinButtonToCard(card)
   
-  // Make card non-interactive via CSS
-  card.style.pointerEvents = 'none'
-  card.style.cursor = 'default'
+  // Allow pinning by clicking the card
+  card.addEventListener('click', (e) => {
+    // Don't pin if clicking the pin button itself (it has its own handler)
+    if (e.target.closest('.pin-button')) return
+    if (window.setPinnedCard) {
+      window.setPinnedCard(card)
+    }
+  })
 
   window.updateGridLayout()
+}
+
+// Add pin button to a video card
+function addPinButtonToCard(card) {
+  // Check if pin button already exists
+  if (card.querySelector('.pin-button')) return
+  
+  const pinButton = document.createElement('button')
+  pinButton.className = 'pin-button'
+  pinButton.type = 'button'
+  pinButton.title = 'Pin video'
+  pinButton.innerHTML = '<i class="fas fa-thumbtack"></i>'
+  
+  pinButton.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (window.setPinnedCard) {
+      window.setPinnedCard(card)
+    }
+  })
+  
+  card.appendChild(pinButton)
 }
 
 // Attach a MediaStream to a user's card and show the video
@@ -240,17 +254,36 @@ window.updateGridLayout = function (count) {
     'layout-5', 'layout-6', 'layout-7', 'layout-8', 'layout-9',
     'layout-10', 'layout-11', 'layout-12', 'layout-13', 'layout-14', 'layout-15', 'layout-16',
     'layout-17plus', 'layout-5plus', 'layout-5plus-scroll',
-    'layout-pinned', 'layout-pinned-mobile'
+    'layout-pinned', 'layout-pinned-mobile', 'layout-mobile-5-6'
   )
 
-  // Handle pinned video layouts
+  // Handle pinned video layouts - show only pinned video, hide grid
   if (hasPinned) {
+    // Hide all cards in grid (they're moved to pagination or hidden)
+    cards.forEach(card => {
+      if (card !== pinnedCard) {
+        card.style.display = 'none'
+      }
+    })
+    
+    // Hide the grid wrapper and show only pinned container
+    const gridWrapper = document.getElementById('videoGridWrapper')
+    if (gridWrapper) {
+      gridWrapper.style.display = 'none'
+    }
+    
     if (screenSize === 'mobile') {
       grid.classList.add('layout-pinned-mobile')
     } else {
       grid.classList.add('layout-pinned')
     }
     return
+  } else {
+    // Show grid wrapper when not pinned
+    const gridWrapper = document.getElementById('videoGridWrapper')
+    if (gridWrapper) {
+      gridWrapper.style.display = 'flex'
+    }
   }
 
   // Auto-pin on mobile disabled - will be implemented later
@@ -267,22 +300,18 @@ window.updateGridLayout = function (count) {
     // Mobile layouts
     if (n === 1 || n === 2) {
       grid.classList.add(n === 1 ? 'layout-1' : 'layout-2')
+      hidePaginationButtons()
     } else if (n === 3 || n === 4) {
       grid.classList.add('layout-4')
+      hidePaginationButtons()
+    } else if (n === 5 || n === 6) {
+      // 5-6 cameras: 3 rows, 2 cameras per row
+      grid.classList.add('layout-mobile-5-6')
+      hidePaginationButtons()
     } else {
-      // 5+ participants: pinned + scrollable
-      grid.classList.add('layout-5plus')
-      // Create scrollable container if it doesn't exist
-      let scrollContainer = grid.querySelector('.layout-5plus-scroll')
-      if (!scrollContainer) {
-        scrollContainer = document.createElement('div')
-        scrollContainer.className = 'layout-5plus-scroll'
-        // Move all cards except first to scroll container
-        cards.slice(1).forEach(card => {
-          scrollContainer.appendChild(card)
-        })
-        grid.appendChild(scrollContainer)
-      }
+      // More than 6 cameras: enable pagination (6 per page for mobile)
+      grid.classList.add('layout-mobile-5-6') // Use same layout, but paginated
+      setupMobilePagination(cards, n)
     }
   } else if (screenSize === 'tablet') {
     // Tablet layouts
@@ -309,26 +338,223 @@ window.updateGridLayout = function (count) {
       grid.classList.add('layout-5plus')
     }
   } else {
-    // Large desktop layouts
+    // Large desktop layouts - with pagination for > 12 videos
     if (n === 1) {
       grid.classList.add('layout-1')
+      hidePaginationButtons()
     } else if (n === 2) {
       grid.classList.add('layout-2')
+      hidePaginationButtons()
     } else if (n === 3) {
       grid.classList.add('layout-3')
+      hidePaginationButtons()
     } else if (n === 4) {
       grid.classList.add('layout-4')
+      hidePaginationButtons()
     } else if (n === 5 || n === 6) {
       grid.classList.add(n === 5 ? 'layout-5' : 'layout-6')
+      hidePaginationButtons()
     } else if (n === 7 || n === 8) {
       grid.classList.add(n === 7 ? 'layout-7' : 'layout-8')
+      hidePaginationButtons()
     } else if (n === 9) {
       grid.classList.add('layout-9')
-    } else if (n >= 10 && n <= 16) {
+      hidePaginationButtons()
+    } else if (n >= 10 && n <= 12) {
       grid.classList.add(`layout-${n}`)
+      hidePaginationButtons()
     } else {
-      grid.classList.add('layout-17plus')
+      // More than 12 videos - enable pagination
+      grid.classList.add('layout-12') // Always show 12 per page
+      setupPagination(cards, n)
     }
+  }
+}
+
+// Pagination functions
+function setupPagination(cards, totalCount) {
+  const totalPages = Math.ceil(totalCount / VIDEOS_PER_PAGE)
+  
+  // Reset to last valid page if current page is out of bounds
+  if (currentGridPage >= totalPages && totalPages > 0) {
+    currentGridPage = Math.max(0, totalPages - 1)
+  }
+  
+  // If no cards, reset to page 0
+  if (totalCount === 0) {
+    currentGridPage = 0
+  }
+  
+  // Show/hide cards based on current page
+  cards.forEach((card, index) => {
+    const startIndex = currentGridPage * VIDEOS_PER_PAGE
+    const endIndex = startIndex + VIDEOS_PER_PAGE
+    
+    if (index >= startIndex && index < endIndex) {
+      card.style.display = ''
+      card.style.visibility = 'visible'
+      card.style.opacity = '1'
+    } else {
+      card.style.display = 'none'
+      card.style.visibility = 'hidden'
+      card.style.opacity = '0'
+    }
+  })
+  
+  // Show/hide navigation buttons
+  const prevBtn = document.getElementById('gridPagePrev')
+  const nextBtn = document.getElementById('gridPageNext')
+  
+  if (totalPages > 1) {
+    if (prevBtn) {
+      prevBtn.classList.remove('hidden')
+      prevBtn.disabled = currentGridPage === 0
+      if (currentGridPage === 0) {
+        prevBtn.style.opacity = '0.5'
+        prevBtn.style.cursor = 'not-allowed'
+      } else {
+        prevBtn.style.opacity = '1'
+        prevBtn.style.cursor = 'pointer'
+      }
+    }
+    
+    if (nextBtn) {
+      nextBtn.classList.remove('hidden')
+      nextBtn.disabled = currentGridPage >= totalPages - 1
+      if (currentGridPage >= totalPages - 1) {
+        nextBtn.style.opacity = '0.5'
+        nextBtn.style.cursor = 'not-allowed'
+      } else {
+        nextBtn.style.opacity = '1'
+        nextBtn.style.cursor = 'pointer'
+      }
+    }
+  } else {
+    hidePaginationButtons()
+  }
+}
+
+function hidePaginationButtons() {
+  const prevBtn = document.getElementById('gridPagePrev')
+  const nextBtn = document.getElementById('gridPageNext')
+  
+  if (prevBtn) prevBtn.classList.add('hidden')
+  if (nextBtn) nextBtn.classList.add('hidden')
+  
+  // Make sure all cards are visible when pagination is disabled
+  const grid = getGridContainer()
+  if (grid) {
+    const cards = Array.from(grid.querySelectorAll('.video-card'))
+    cards.forEach(card => {
+      card.style.display = ''
+      card.style.visibility = 'visible'
+      card.style.opacity = '1'
+    })
+  }
+}
+
+
+function goToNextPage() {
+  const grid = getGridContainer()
+  if (!grid) return
+  
+  const cards = Array.from(grid.querySelectorAll('.video-card'))
+  const totalCount = cards.length
+  const screenSize = getScreenSize()
+  const videosPerPage = screenSize === 'mobile' ? VIDEOS_PER_PAGE_MOBILE : VIDEOS_PER_PAGE
+  const totalPages = Math.ceil(totalCount / videosPerPage)
+  
+  if (currentGridPage < totalPages - 1) {
+    currentGridPage++
+    if (screenSize === 'mobile') {
+      setupMobilePagination(cards, totalCount)
+    } else {
+      setupPagination(cards, totalCount)
+    }
+  }
+}
+
+function goToPreviousPage() {
+  const grid = getGridContainer()
+  if (!grid) return
+  
+  const cards = Array.from(grid.querySelectorAll('.video-card'))
+  const totalCount = cards.length
+  const screenSize = getScreenSize()
+  
+  if (screenSize === 'mobile') {
+    if (currentGridPage > 0) {
+      currentGridPage--
+      setupMobilePagination(cards, totalCount)
+    }
+  } else {
+    if (currentGridPage > 0) {
+      currentGridPage--
+      setupPagination(cards, totalCount)
+    }
+  }
+}
+
+// Mobile pagination setup (6 videos per page)
+function setupMobilePagination(cards, totalCount) {
+  const totalPages = Math.ceil(totalCount / VIDEOS_PER_PAGE_MOBILE)
+  
+  // Reset to last valid page if current page is out of bounds
+  if (currentGridPage >= totalPages && totalPages > 0) {
+    currentGridPage = Math.max(0, totalPages - 1)
+  }
+  
+  // If no cards, reset to page 0
+  if (totalCount === 0) {
+    currentGridPage = 0
+  }
+  
+  // Show/hide cards based on current page
+  cards.forEach((card, index) => {
+    const startIndex = currentGridPage * VIDEOS_PER_PAGE_MOBILE
+    const endIndex = startIndex + VIDEOS_PER_PAGE_MOBILE
+    
+    if (index >= startIndex && index < endIndex) {
+      card.style.display = ''
+      card.style.visibility = 'visible'
+      card.style.opacity = '1'
+    } else {
+      card.style.display = 'none'
+      card.style.visibility = 'hidden'
+      card.style.opacity = '0'
+    }
+  })
+  
+  // Show/hide navigation buttons
+  const prevBtn = document.getElementById('gridPagePrev')
+  const nextBtn = document.getElementById('gridPageNext')
+  
+  if (totalPages > 1) {
+    if (prevBtn) {
+      prevBtn.classList.remove('hidden')
+      prevBtn.disabled = currentGridPage === 0
+      if (currentGridPage === 0) {
+        prevBtn.style.opacity = '0.5'
+        prevBtn.style.cursor = 'not-allowed'
+      } else {
+        prevBtn.style.opacity = '1'
+        prevBtn.style.cursor = 'pointer'
+      }
+    }
+    
+    if (nextBtn) {
+      nextBtn.classList.remove('hidden')
+      nextBtn.disabled = currentGridPage >= totalPages - 1
+      if (currentGridPage >= totalPages - 1) {
+        nextBtn.style.opacity = '0.5'
+        nextBtn.style.cursor = 'not-allowed'
+      } else {
+        nextBtn.style.opacity = '1'
+        nextBtn.style.cursor = 'pointer'
+      }
+    }
+  } else {
+    hidePaginationButtons()
   }
 }
 
@@ -337,6 +563,7 @@ let resizeTimeout
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimeout)
   resizeTimeout = setTimeout(() => {
+    currentGridPage = 0 // Reset to first page on resize
     window.updateGridLayout()
   }, 150)
 })
@@ -1023,6 +1250,21 @@ async function joinRoom(name, room_id) {
     lobbyPreview.classList.add('hidden')
   }
 
+  // Clean up any leftover participant cards from previous sessions
+  if (videoGrid) {
+    const existingCards = videoGrid.querySelectorAll('.video-card')
+    existingCards.forEach((card) => {
+      const video = card.querySelector('video')
+      if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach((track) => track.stop())
+        video.srcObject = null
+      }
+      if (card.parentNode) {
+        card.parentNode.removeChild(card)
+      }
+    })
+  }
+
   initEnumerateDevices()
 
   rc = new RoomClient(
@@ -1193,17 +1435,36 @@ function toggleFullscreen() {
   const container = document.getElementById('mainVideoAreaContainer')
   const fullscreenIcon = document.getElementById('fullscreenIcon')
   
-  if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+  // Detect iOS
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  
+  // Check if already in fullscreen
+  const isFullscreen = !!(document.fullscreenElement || 
+                         document.webkitFullscreenElement || 
+                         document.mozFullScreenElement || 
+                         document.msFullscreenElement)
+  
+  if (!isFullscreen) {
     // Enter fullscreen
     try {
-      if (container.requestFullscreen) {
+      if (isIOS) {
+        // iOS Safari doesn't support container fullscreen, use viewport workaround
+        // Make container take full viewport
+        if (container) {
+          container.classList.add('ios-fullscreen')
+          document.body.style.overflow = 'hidden'
+          
+          // Try to make the first visible video fullscreen if available
+          const firstVideo = container.querySelector('video:not(.hidden)')
+          if (firstVideo && firstVideo.webkitEnterFullscreen) {
+            firstVideo.webkitEnterFullscreen()
+          }
+        }
+      } else if (container.requestFullscreen) {
         container.requestFullscreen()
       } else if (container.webkitRequestFullscreen) {
-        // For iOS Safari
         container.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT)
-      } else if (container.webkitEnterFullscreen) {
-        // Alternative for older iOS
-        container.webkitEnterFullscreen()
       } else if (container.mozRequestFullScreen) {
         container.mozRequestFullScreen()
       } else if (container.msRequestFullscreen) {
@@ -1211,6 +1472,11 @@ function toggleFullscreen() {
       }
     } catch (error) {
       console.error('Error entering fullscreen:', error)
+      // Fallback for iOS: use viewport approach
+      if (isIOS && container) {
+        container.classList.add('ios-fullscreen')
+        document.body.style.overflow = 'hidden'
+      }
     }
     
     if (fullscreenIcon) {
@@ -1219,7 +1485,17 @@ function toggleFullscreen() {
   } else {
     // Exit fullscreen
     try {
-      if (document.exitFullscreen) {
+      if (isIOS) {
+        // Exit iOS fullscreen
+        if (container) {
+          container.classList.remove('ios-fullscreen')
+          document.body.style.overflow = ''
+        }
+        // Try to exit video fullscreen if active
+        if (document.webkitCancelFullScreen) {
+          document.webkitCancelFullScreen()
+        }
+      } else if (document.exitFullscreen) {
         document.exitFullscreen()
       } else if (document.webkitExitFullscreen) {
         document.webkitExitFullscreen()
@@ -1230,6 +1506,11 @@ function toggleFullscreen() {
       }
     } catch (error) {
       console.error('Error exiting fullscreen:', error)
+      // Fallback for iOS
+      if (isIOS && container) {
+        container.classList.remove('ios-fullscreen')
+        document.body.style.overflow = ''
+      }
     }
     
     if (fullscreenIcon) {
@@ -1240,7 +1521,12 @@ function toggleFullscreen() {
 
 function updateFullscreenIcon() {
   const fullscreenIcon = document.getElementById('fullscreenIcon')
-  const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement)
+  const container = document.getElementById('mainVideoAreaContainer')
+  const isFullscreen = !!(document.fullscreenElement || 
+                         document.webkitFullscreenElement || 
+                         document.mozFullScreenElement || 
+                         document.msFullscreenElement ||
+                         (container && container.classList.contains('ios-fullscreen')))
   
   if (fullscreenIcon) {
     fullscreenIcon.className = isFullscreen ? 'fas fa-compress' : 'fas fa-expand'
@@ -1249,7 +1535,14 @@ function updateFullscreenIcon() {
 
 async function leaveAndExit() {
   // Exit fullscreen if active
-  if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+  const container = document.getElementById('mainVideoAreaContainer')
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  
+  if (isIOS && container && container.classList.contains('ios-fullscreen')) {
+    container.classList.remove('ios-fullscreen')
+    document.body.style.overflow = ''
+  } else if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
     if (document.exitFullscreen) {
       document.exitFullscreen()
     } else if (document.webkitExitFullscreen) {
@@ -1285,14 +1578,41 @@ async function leaveAndExit() {
 window.setPinnedCard = function (card) {
   if (!card) return
   const pinnedContainer = pinnedContainerEl()
-  const grid = videoGrid
+  const grid = getGridContainer()
+  const gridWrapper = document.getElementById('videoGridWrapper')
   if (!pinnedContainer || !grid) return
 
   // Unpin if clicking the currently pinned card
   if (pinnedCard === card) {
+    // Unpin: restore grid layout
     pinnedContainer.classList.add('hidden')
-    grid.appendChild(card)
+    
+    // Move card back to grid
+    if (card.parentNode === pinnedContainer) {
+      grid.appendChild(card)
+    }
+    
+    // Show grid wrapper
+    if (gridWrapper) {
+      gridWrapper.style.display = 'flex'
+    }
+    
+    // Show all cards in grid (they were hidden when pinned)
+    const allCards = Array.from(grid.querySelectorAll('.video-card'))
+    allCards.forEach(c => {
+      if (c !== card) {
+        c.style.display = ''
+        c.style.visibility = 'visible'
+        c.style.opacity = '1'
+      }
+    })
+    
     pinnedCard = null
+    card.classList.remove('pinned')
+    
+    // Reset pagination to first page
+    currentGridPage = 0
+    
     // Update layout when unpinning
     setTimeout(() => {
       window.updateGridLayout()
@@ -1300,15 +1620,41 @@ window.setPinnedCard = function (card) {
     return
   }
 
-  // Move previous pinned back to grid
+  // Pin: show only this card, hide others
+  // Move previous pinned back to grid if exists
   if (pinnedCard && pinnedCard.parentNode === pinnedContainer) {
     grid.appendChild(pinnedCard)
+    pinnedCard.classList.remove('pinned')
   }
 
+  // Hide grid wrapper
+  if (gridWrapper) {
+    gridWrapper.style.display = 'none'
+  }
+
+  // Hide all cards in grid (they'll be restored when unpinned)
+  const allCards = Array.from(grid.querySelectorAll('.video-card'))
+  allCards.forEach(c => {
+    if (c !== card) {
+      c.style.display = 'none'
+      c.style.visibility = 'hidden'
+      c.style.opacity = '0'
+    }
+  })
+
+  // Move card to pinned container
+  if (card.parentNode) {
+    card.parentNode.removeChild(card)
+  }
+  
   pinnedContainer.innerHTML = ''
   pinnedContainer.appendChild(card)
   pinnedContainer.classList.remove('hidden')
   pinnedCard = card
+  card.classList.add('pinned')
+
+  // Hide pagination buttons when pinned
+  hidePaginationButtons()
 
   // Update layout when pinning
   setTimeout(() => {
@@ -1321,6 +1667,11 @@ function pinnedContainerEl() {
 }
 
 let isEnumerateDevices = false
+
+// Pagination state for video grid
+let currentGridPage = 0
+const VIDEOS_PER_PAGE = 12
+const VIDEOS_PER_PAGE_MOBILE = 6
 
 function initEnumerateDevices() {
   // Many browsers, without the consent of getUserMedia, cannot enumerate the devices.

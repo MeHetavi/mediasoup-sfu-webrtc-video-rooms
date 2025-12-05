@@ -772,8 +772,16 @@ class RoomClient {
     this.localMediaEl.appendChild(card)
     this.localCard = card
 
+    // Add pin icon button
+    if (typeof addPinButtonToCard === 'function') {
+      addPinButtonToCard(card)
+    }
+    
     // Allow pinning by clicking the card
-    card.addEventListener('click', () => {
+    card.style.cursor = 'pointer'
+    card.addEventListener('click', (e) => {
+      // Don't pin if clicking the pin button itself
+      if (e.target.closest('.pin-button')) return
       if (window.setPinnedCard) {
         window.setPinnedCard(card)
       }
@@ -835,8 +843,16 @@ class RoomClient {
     this.remoteVideoEl.appendChild(card)
     this.peerCardsById.set(socketId, card)
 
+    // Add pin icon button
+    if (typeof addPinButtonToCard === 'function') {
+      addPinButtonToCard(card)
+    }
+    
     // Allow pinning by clicking the card
-    card.addEventListener('click', () => {
+    card.style.cursor = 'pointer'
+    card.addEventListener('click', (e) => {
+      // Don't pin if clicking the pin button itself
+      if (e.target.closest('.pin-button')) return
       if (window.setPinnedCard) {
         window.setPinnedCard(card)
       }

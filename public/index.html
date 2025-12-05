@@ -101,7 +101,15 @@
         </button>
         <div id="videoMedia" class="hidden space-y-4">
             <div id="pinnedContainer" class="hidden"></div>
-            <div id="videoGrid" class="containers"></div>
+            <div id="videoGridWrapper" class="relative w-full h-full">
+                <button id="gridPagePrev" class="grid-pagination-btn grid-pagination-left hidden" onclick="goToPreviousPage()" title="Previous page">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div id="videoGrid" class="containers"></div>
+                <button id="gridPageNext" class="grid-pagination-btn grid-pagination-right hidden" onclick="goToNextPage()" title="Next page">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
             <div id="remoteAudios"></div>
         </div>
         
@@ -110,39 +118,39 @@
         <div class="flex items-center justify-center gap-2 text-sm">
 
 
-            <div class="hidden inline-flex items-center gap-2" id="audioControls">
+            <div class="hidden inline-flex items-center gap-1" id="audioControls">
                 <button id="startAudioButton"
-                    class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                    class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
                     onclick="rc.produce(RoomClient.mediaType.audio, audioSelect.value)">
                     <img src="/mic_off.svg" alt="Microphone" class="control-icon" />
                 </button>
                 <button id="stopAudioButton"
-                    class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                    class="hidden inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
                     onclick="rc.closeProducer(RoomClient.mediaType.audio)">
                     <img src="/mic_on.svg" alt="Microphone" class="control-icon" />
                 </button>
                 <select id="audioSelect" class="device-select"></select>
             </div>
-            <div class="hidden inline-flex items-center gap-2" id="videoControls">
+            <div class="hidden inline-flex items-center gap-1" id="videoControls">
                 <button id="startVideoButton"
-                    class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                    class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
                     onclick="rc.produce(RoomClient.mediaType.video, videoSelect.value)">
                     <img src="/camera_off.svg" alt="Camera" class="control-icon" />
                 </button>
                 <button id="stopVideoButton"
-                    class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                    class="hidden inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
                     onclick="rc.closeProducer(RoomClient.mediaType.video)">
                     <img src="/camera_on.svg" alt="Camera" class="control-icon" />
                 </button>
                 <select id="videoSelect" class="device-select"></select>
             </div>
             <button id="participantsButton"
-                class="hidden inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                class="hidden inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
                 onclick="openParticipantsModal()">
                 <img src="/participants.svg" alt="Participants" class="control-icon" />
             </button>
             <button id="exitButton"
-                class="hidden inline-flex items-center bg-red-500 gap-1 rounded-md px-3 py-1.5 text-white transition-colors control-button"
+                class="hidden inline-flex items-center bg-red-500 gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
                 onclick="leaveAndExit()">
                 <img src="/exit.svg" alt="Exit" class="exit-icon" />
             </button>
