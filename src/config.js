@@ -68,7 +68,7 @@ module.exports = {
       listenIps: [
         {
           ip: '0.0.0.0',
-          announcedIp: '10.160.0.2' // replace by public IP address
+          announcedIp: '34.100.140.55' // replace by public IP address
         }
       ],
       maxIncomingBitrate: 1500000,
