@@ -7,8 +7,6 @@ let lobbyPreviewStream = null
 let lobbyAudioDeviceId = null
 let lobbyVideoDeviceId = null
 
-nameInput.value = 'user_' + Math.round(Math.random() * 1000)
-
 socket.request = function request(type, data = {}) {
   return new Promise((resolve, reject) => {
     socket.emit(type, data, (data) => {
@@ -107,7 +105,7 @@ window.createUserCard = function (id, name, avatar) {
   video.setAttribute('playsinline', 'true')
   video.setAttribute('webkit-playsinline', 'true')
   video.className = 'vid hidden'
-  
+
   // Prevent video from opening browser's video player
   // CSS pointer-events: none will make clicks pass through to card
   // But add additional prevention just in case
@@ -116,30 +114,30 @@ window.createUserCard = function (id, name, avatar) {
     e.stopPropagation()
     return false
   })
-  
+
   // Prevent context menu and double-click on video
   video.addEventListener('contextmenu', (e) => {
     e.preventDefault()
     e.stopPropagation()
     return false
   })
-  
+
   video.addEventListener('dblclick', (e) => {
     e.preventDefault()
     e.stopPropagation()
     return false
   })
-  
+
   card.appendChild(video)
 
   grid.appendChild(card)
 
   // Make card interactive for pinning
   card.style.cursor = 'pointer'
-  
+
   // Add pin icon button
   addPinButtonToCard(card)
-  
+
   // Allow pinning by clicking the card
   card.addEventListener('click', (e) => {
     // Don't pin if clicking the pin button itself (it has its own handler)
@@ -156,20 +154,20 @@ window.createUserCard = function (id, name, avatar) {
 function addPinButtonToCard(card) {
   // Check if pin button already exists
   if (card.querySelector('.pin-button')) return
-  
+
   const pinButton = document.createElement('button')
   pinButton.className = 'pin-button'
   pinButton.type = 'button'
   pinButton.title = 'Pin video'
   pinButton.innerHTML = '<i class="fas fa-thumbtack"></i>'
-  
+
   pinButton.addEventListener('click', (e) => {
     e.stopPropagation()
     if (window.setPinnedCard) {
       window.setPinnedCard(card)
     }
   })
-  
+
   card.appendChild(pinButton)
 }
 
@@ -265,13 +263,13 @@ window.updateGridLayout = function (count) {
         card.style.display = 'none'
       }
     })
-    
+
     // Hide the grid wrapper and show only pinned container
     const gridWrapper = document.getElementById('videoGridWrapper')
     if (gridWrapper) {
       gridWrapper.style.display = 'none'
     }
-    
+
     if (screenSize === 'mobile') {
       grid.classList.add('layout-pinned-mobile')
     } else {
@@ -374,22 +372,22 @@ window.updateGridLayout = function (count) {
 // Pagination functions
 function setupPagination(cards, totalCount) {
   const totalPages = Math.ceil(totalCount / VIDEOS_PER_PAGE)
-  
+
   // Reset to last valid page if current page is out of bounds
   if (currentGridPage >= totalPages && totalPages > 0) {
     currentGridPage = Math.max(0, totalPages - 1)
   }
-  
+
   // If no cards, reset to page 0
   if (totalCount === 0) {
     currentGridPage = 0
   }
-  
+
   // Show/hide cards based on current page
   cards.forEach((card, index) => {
     const startIndex = currentGridPage * VIDEOS_PER_PAGE
     const endIndex = startIndex + VIDEOS_PER_PAGE
-    
+
     if (index >= startIndex && index < endIndex) {
       card.style.display = ''
       card.style.visibility = 'visible'
@@ -400,11 +398,11 @@ function setupPagination(cards, totalCount) {
       card.style.opacity = '0'
     }
   })
-  
+
   // Show/hide navigation buttons
   const prevBtn = document.getElementById('gridPagePrev')
   const nextBtn = document.getElementById('gridPageNext')
-  
+
   if (totalPages > 1) {
     if (prevBtn) {
       prevBtn.classList.remove('hidden')
@@ -417,7 +415,7 @@ function setupPagination(cards, totalCount) {
         prevBtn.style.cursor = 'pointer'
       }
     }
-    
+
     if (nextBtn) {
       nextBtn.classList.remove('hidden')
       nextBtn.disabled = currentGridPage >= totalPages - 1
@@ -437,10 +435,10 @@ function setupPagination(cards, totalCount) {
 function hidePaginationButtons() {
   const prevBtn = document.getElementById('gridPagePrev')
   const nextBtn = document.getElementById('gridPageNext')
-  
+
   if (prevBtn) prevBtn.classList.add('hidden')
   if (nextBtn) nextBtn.classList.add('hidden')
-  
+
   // Make sure all cards are visible when pagination is disabled
   const grid = getGridContainer()
   if (grid) {
@@ -457,13 +455,13 @@ function hidePaginationButtons() {
 function goToNextPage() {
   const grid = getGridContainer()
   if (!grid) return
-  
+
   const cards = Array.from(grid.querySelectorAll('.video-card'))
   const totalCount = cards.length
   const screenSize = getScreenSize()
   const videosPerPage = screenSize === 'mobile' ? VIDEOS_PER_PAGE_MOBILE : VIDEOS_PER_PAGE
   const totalPages = Math.ceil(totalCount / videosPerPage)
-  
+
   if (currentGridPage < totalPages - 1) {
     currentGridPage++
     if (screenSize === 'mobile') {
@@ -477,11 +475,11 @@ function goToNextPage() {
 function goToPreviousPage() {
   const grid = getGridContainer()
   if (!grid) return
-  
+
   const cards = Array.from(grid.querySelectorAll('.video-card'))
   const totalCount = cards.length
   const screenSize = getScreenSize()
-  
+
   if (screenSize === 'mobile') {
     if (currentGridPage > 0) {
       currentGridPage--
@@ -498,22 +496,22 @@ function goToPreviousPage() {
 // Mobile pagination setup (6 videos per page)
 function setupMobilePagination(cards, totalCount) {
   const totalPages = Math.ceil(totalCount / VIDEOS_PER_PAGE_MOBILE)
-  
+
   // Reset to last valid page if current page is out of bounds
   if (currentGridPage >= totalPages && totalPages > 0) {
     currentGridPage = Math.max(0, totalPages - 1)
   }
-  
+
   // If no cards, reset to page 0
   if (totalCount === 0) {
     currentGridPage = 0
   }
-  
+
   // Show/hide cards based on current page
   cards.forEach((card, index) => {
     const startIndex = currentGridPage * VIDEOS_PER_PAGE_MOBILE
     const endIndex = startIndex + VIDEOS_PER_PAGE_MOBILE
-    
+
     if (index >= startIndex && index < endIndex) {
       card.style.display = ''
       card.style.visibility = 'visible'
@@ -524,11 +522,11 @@ function setupMobilePagination(cards, totalCount) {
       card.style.opacity = '0'
     }
   })
-  
+
   // Show/hide navigation buttons
   const prevBtn = document.getElementById('gridPagePrev')
   const nextBtn = document.getElementById('gridPageNext')
-  
+
   if (totalPages > 1) {
     if (prevBtn) {
       prevBtn.classList.remove('hidden')
@@ -541,7 +539,7 @@ function setupMobilePagination(cards, totalCount) {
         prevBtn.style.cursor = 'pointer'
       }
     }
-    
+
     if (nextBtn) {
       nextBtn.classList.remove('hidden')
       nextBtn.disabled = currentGridPage >= totalPages - 1
@@ -1308,7 +1306,7 @@ function roomOpen() {
   reveal(control)
   reveal(mainVideoAreaContainer)
   reveal(videoMedia)
-  
+
   // Show fullscreen button
   const fullscreenButton = document.getElementById('fullscreenButton')
   if (fullscreenButton) {
@@ -1415,7 +1413,7 @@ function addListeners() {
   document.addEventListener('webkitfullscreenchange', updateFullscreenIcon)
   document.addEventListener('mozfullscreenchange', updateFullscreenIcon)
   document.addEventListener('MSFullscreenChange', updateFullscreenIcon)
-  
+
   // Add mobile-friendly touch handler for fullscreen button
   const fullscreenButton = document.getElementById('fullscreenButton')
   if (fullscreenButton) {
@@ -1434,17 +1432,17 @@ function addListeners() {
 function toggleFullscreen() {
   const container = document.getElementById('mainVideoAreaContainer')
   const fullscreenIcon = document.getElementById('fullscreenIcon')
-  
+
   // Detect iOS
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
   // Check if already in fullscreen
-  const isFullscreen = !!(document.fullscreenElement || 
-                         document.webkitFullscreenElement || 
-                         document.mozFullScreenElement || 
-                         document.msFullscreenElement)
-  
+  const isFullscreen = !!(document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement)
+
   if (!isFullscreen) {
     // Enter fullscreen
     try {
@@ -1454,7 +1452,7 @@ function toggleFullscreen() {
         if (container) {
           container.classList.add('ios-fullscreen')
           document.body.style.overflow = 'hidden'
-          
+
           // Try to make the first visible video fullscreen if available
           const firstVideo = container.querySelector('video:not(.hidden)')
           if (firstVideo && firstVideo.webkitEnterFullscreen) {
@@ -1478,7 +1476,7 @@ function toggleFullscreen() {
         document.body.style.overflow = 'hidden'
       }
     }
-    
+
     if (fullscreenIcon) {
       fullscreenIcon.className = 'fas fa-compress'
     }
@@ -1512,7 +1510,7 @@ function toggleFullscreen() {
         document.body.style.overflow = ''
       }
     }
-    
+
     if (fullscreenIcon) {
       fullscreenIcon.className = 'fas fa-expand'
     }
@@ -1522,12 +1520,12 @@ function toggleFullscreen() {
 function updateFullscreenIcon() {
   const fullscreenIcon = document.getElementById('fullscreenIcon')
   const container = document.getElementById('mainVideoAreaContainer')
-  const isFullscreen = !!(document.fullscreenElement || 
-                         document.webkitFullscreenElement || 
-                         document.mozFullScreenElement || 
-                         document.msFullscreenElement ||
-                         (container && container.classList.contains('ios-fullscreen')))
-  
+  const isFullscreen = !!(document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement ||
+    (container && container.classList.contains('ios-fullscreen')))
+
   if (fullscreenIcon) {
     fullscreenIcon.className = isFullscreen ? 'fas fa-compress' : 'fas fa-expand'
   }
@@ -1536,9 +1534,9 @@ function updateFullscreenIcon() {
 async function leaveAndExit() {
   // Exit fullscreen if active
   const container = document.getElementById('mainVideoAreaContainer')
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
   if (isIOS && container && container.classList.contains('ios-fullscreen')) {
     container.classList.remove('ios-fullscreen')
     document.body.style.overflow = ''
@@ -1553,13 +1551,13 @@ async function leaveAndExit() {
       document.msExitFullscreen()
     }
   }
-  
+
   // Hide fullscreen button
   const fullscreenButton = document.getElementById('fullscreenButton')
   if (fullscreenButton) {
     fullscreenButton.classList.add('hidden')
   }
-  
+
   hide(mainVideoAreaContainer)
   reveal(lobbyContainer)
   // Track leave (non-blocking)
@@ -1586,17 +1584,17 @@ window.setPinnedCard = function (card) {
   if (pinnedCard === card) {
     // Unpin: restore grid layout
     pinnedContainer.classList.add('hidden')
-    
+
     // Move card back to grid
     if (card.parentNode === pinnedContainer) {
       grid.appendChild(card)
     }
-    
+
     // Show grid wrapper
     if (gridWrapper) {
       gridWrapper.style.display = 'flex'
     }
-    
+
     // Show all cards in grid (they were hidden when pinned)
     const allCards = Array.from(grid.querySelectorAll('.video-card'))
     allCards.forEach(c => {
@@ -1606,13 +1604,13 @@ window.setPinnedCard = function (card) {
         c.style.opacity = '1'
       }
     })
-    
+
     pinnedCard = null
     card.classList.remove('pinned')
-    
+
     // Reset pagination to first page
     currentGridPage = 0
-    
+
     // Update layout when unpinning
     setTimeout(() => {
       window.updateGridLayout()
@@ -1646,7 +1644,7 @@ window.setPinnedCard = function (card) {
   if (card.parentNode) {
     card.parentNode.removeChild(card)
   }
-  
+
   pinnedContainer.innerHTML = ''
   pinnedContainer.appendChild(card)
   pinnedContainer.classList.remove('hidden')
