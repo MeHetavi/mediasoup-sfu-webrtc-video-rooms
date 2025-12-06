@@ -781,8 +781,9 @@ async function checkOwnershipAndOngoing(roomId, displayName) {
     console.warn('Ongoing check failed; blocking join for safety.')
     return { allowed: false, message: 'Waiting for Yogacharya to start the session.' }
   }
-
+  console.log('Ongoing check successful:', ongoing)
   const isOngoing = ongoing.ongoing === true || ongoing.is_ongoing === true
+  console.log('Is ongoing:', isOngoing)
   const ongoingOccurrence = ongoing.data?.ongoing_occurrence || ongoing.ongoing_occurrence
 
   // If not ongoing and user is not owner, block join

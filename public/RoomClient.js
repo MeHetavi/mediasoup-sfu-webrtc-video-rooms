@@ -20,6 +20,7 @@ class RoomClient {
     this.mediasoupClient = mediasoupClient
 
     this.socket = socket
+    this.mySocketId = socket.id // Store our own socketId for comparison
     this.producerTransport = null
     this.consumerTransport = null
     this.device = null
@@ -83,6 +84,9 @@ class RoomClient {
         isTrainer: this.isTrainer
       })
       console.log('Joined to room', e)
+
+      // Update our socketId after joining (socket.id might change on reconnect)
+      this.mySocketId = this.socket.id
 
       const data = await this.socket.request('getRouterRtpCapabilities')
       const device = await this.loadDevice(data)
@@ -259,8 +263,13 @@ class RoomClient {
     this.socket.on(
       'peerJoined',
       function ({ name, socketId, avatar, isTrainer }) {
-        if (!socketId || !name || name === this.name) return
-        this.createOrGetRemoteCard(socketId, name, avatar, isTrainer)
+        // Only skip if it's our own socketId (check by socketId, not name, to allow same names)
+        if (!socketId) return
+        // Don't create card for ourselves - we have a local card
+        if (socketId === this.socket.id) return
+
+        // Always create/get card using socketId as unique identifier (allows same names)
+        this.createOrGetRemoteCard(socketId, name || 'Participant', avatar, isTrainer)
       }.bind(this)
     )
 
@@ -497,8 +506,16 @@ class RoomClient {
         let elem
         if (kind === 'video') {
           let card = null
-          if (ownerSocketId && this.peerCardsById.has(ownerSocketId)) {
-            card = this.peerCardsById.get(ownerSocketId)
+          if (ownerSocketId) {
+            // Always try to get or create card for this socketId
+            if (this.peerCardsById.has(ownerSocketId)) {
+              card = this.peerCardsById.get(ownerSocketId)
+            } else {
+              // Card doesn't exist yet - create a placeholder card for this socketId
+              // We'll get the name from roomInfo if available, otherwise use a generic name
+              console.log('Creating card for socketId:', ownerSocketId, 'producer_id:', producer_id)
+              card = this.createOrGetRemoteCard(ownerSocketId, 'Participant', null, false)
+            }
           }
 
           if (card) {
@@ -517,7 +534,8 @@ class RoomClient {
             if (placeholder) placeholder.classList.add('hidden')
             this.handleFS(elem.id)
           } else {
-            // Fallback: attach directly if we don't have a card
+            // Fallback: attach directly if we don't have ownerSocketId
+            console.warn('No ownerSocketId provided, creating fallback video element')
             elem = document.createElement('video')
             elem.srcObject = stream
             elem.id = consumer.id
@@ -708,13 +726,17 @@ class RoomClient {
       if (info && info.peers) {
         const peersArr = JSON.parse(info.peers)
         peersArr.forEach(([socketId, peer]) => {
-          if (!peer || !peer.name) return
-          if (peer.name === this.name) {
+          if (!socketId || !peer) return
+          // Use socketId comparison, not name, to allow users with same names
+          // Skip creating a card for our own socketId (we have a local card)
+          if (socketId === this.mySocketId) {
             // Map our own socket id to the local card
             this.peerCardsById.set(socketId, localCard)
-          } else {
-            this.createOrGetRemoteCard(socketId, peer.name, peer.avatar, peer.isTrainer)
+            return
           }
+          // Always create remote cards using socketId as unique identifier
+          // This allows multiple users with the same name to have separate cards
+          this.createOrGetRemoteCard(socketId, peer.name || 'Participant', peer.avatar, peer.isTrainer)
         })
       }
     } catch (e) {
