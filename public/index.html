@@ -35,7 +35,8 @@
     </div>
 
     <!-- Top lobby area: video preview on the left, details on the right -->
-    <div id="lobbyContainer" class="w-full min-h-screen flex justify-center items-start md:items-center px-4 py-4 md:py-6 md:py-8 overflow-y-auto">
+    <div id="lobbyContainer"
+        class="w-full min-h-screen flex justify-center items-start md:items-center px-4 py-4 md:py-6 md:py-8 overflow-y-auto">
         <div class="w-full max-w-6xl flex flex-col md:flex-row gap-4 md:gap-6 items-stretch pb-4 md:pb-0">
             <!-- Left: live video preview -->
             <div class="w-full md:w-1/2 flex justify-center">
@@ -81,7 +82,8 @@
                     </div>
                     <div class="lobby-name-input-wrapper">
                         <label for="nameInput" class="lobby-name-label">Name</label>
-                        <input id="nameInput" value="user" type="text" class="lobby-name-input" />
+                        <input id="nameInput" value="" type="text" class="lobby-name-input"
+                            placeholder="Enter your name" />
                     </div>
                     <input id="roomidInput" value="123" type="hidden" />
                     <button id="joinButton" onclick="joinRoom(nameInput.value, roomidInput.value)"
@@ -96,65 +98,68 @@
     <!-- Main video area -->
     <div id="mainVideoAreaContainer" class="hidden w-full px-4 main-video-area">
         <!-- Fullscreen toggle button -->
-        <button id="fullscreenButton" class="fullscreen-toggle-btn hidden" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+        <button id="fullscreenButton" class="fullscreen-toggle-btn hidden" onclick="toggleFullscreen()"
+            title="Toggle Fullscreen">
             <i id="fullscreenIcon" class="fas fa-expand"></i>
         </button>
         <div id="videoMedia" class="hidden space-y-4">
             <div id="pinnedContainer" class="hidden"></div>
             <div id="videoGridWrapper" class="relative w-full h-full">
-                <button id="gridPagePrev" class="grid-pagination-btn grid-pagination-left hidden" onclick="goToPreviousPage()" title="Previous page">
+                <button id="gridPagePrev" class="grid-pagination-btn grid-pagination-left hidden"
+                    onclick="goToPreviousPage()" title="Previous page">
                     <i class="fas fa-chevron-left"></i>
                 </button>
                 <div id="videoGrid" class="containers"></div>
-                <button id="gridPageNext" class="grid-pagination-btn grid-pagination-right hidden" onclick="goToNextPage()" title="Next page">
+                <button id="gridPageNext" class="grid-pagination-btn grid-pagination-right hidden"
+                    onclick="goToNextPage()" title="Next page">
                     <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
             <div id="remoteAudios"></div>
         </div>
-        
+
         <!-- Bottom control panel (moved inside for fullscreen visibility) -->
         <div id="control" class="hidden fixed left-1/2 bottom-8 -translate-x-1/2 z-50 bottom-bar">
-        <div class="flex items-center justify-center gap-2 text-sm">
+            <div class="flex items-center justify-center gap-2 text-sm">
 
 
-            <div class="hidden inline-flex items-center gap-1" id="audioControls">
-                <button id="startAudioButton"
-                    class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
-                    onclick="rc.produce(RoomClient.mediaType.audio, audioSelect.value)">
-                    <img src="/mic_off.svg" alt="Microphone" class="control-icon" />
-                </button>
-                <button id="stopAudioButton"
+                <div class="hidden inline-flex items-center gap-1" id="audioControls">
+                    <button id="startAudioButton"
+                        class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
+                        onclick="rc.produce(RoomClient.mediaType.audio, audioSelect.value)">
+                        <img src="/mic_off.svg" alt="Microphone" class="control-icon" />
+                    </button>
+                    <button id="stopAudioButton"
+                        class="hidden inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
+                        onclick="rc.closeProducer(RoomClient.mediaType.audio)">
+                        <img src="/mic_on.svg" alt="Microphone" class="control-icon" />
+                    </button>
+                    <select id="audioSelect" class="device-select"></select>
+                </div>
+                <div class="hidden inline-flex items-center gap-1" id="videoControls">
+                    <button id="startVideoButton"
+                        class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
+                        onclick="rc.produce(RoomClient.mediaType.video, videoSelect.value)">
+                        <img src="/camera_off.svg" alt="Camera" class="control-icon" />
+                    </button>
+                    <button id="stopVideoButton"
+                        class="hidden inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
+                        onclick="rc.closeProducer(RoomClient.mediaType.video)">
+                        <img src="/camera_on.svg" alt="Camera" class="control-icon" />
+                    </button>
+                    <select id="videoSelect" class="device-select"></select>
+                </div>
+                <button id="participantsButton"
                     class="hidden inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
-                    onclick="rc.closeProducer(RoomClient.mediaType.audio)">
-                    <img src="/mic_on.svg" alt="Microphone" class="control-icon" />
+                    onclick="openParticipantsModal()">
+                    <img src="/participants.svg" alt="Participants" class="control-icon" />
                 </button>
-                <select id="audioSelect" class="device-select"></select>
+                <button id="exitButton"
+                    class="hidden inline-flex items-center bg-red-500 gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
+                    onclick="leaveAndExit()">
+                    <img src="/exit.svg" alt="Exit" class="exit-icon" />
+                </button>
             </div>
-            <div class="hidden inline-flex items-center gap-1" id="videoControls">
-                <button id="startVideoButton"
-                    class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
-                    onclick="rc.produce(RoomClient.mediaType.video, videoSelect.value)">
-                    <img src="/camera_off.svg" alt="Camera" class="control-icon" />
-                </button>
-                <button id="stopVideoButton"
-                    class="hidden inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
-                    onclick="rc.closeProducer(RoomClient.mediaType.video)">
-                    <img src="/camera_on.svg" alt="Camera" class="control-icon" />
-                </button>
-                <select id="videoSelect" class="device-select"></select>
-            </div>
-            <button id="participantsButton"
-                class="hidden inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
-                onclick="openParticipantsModal()">
-                <img src="/participants.svg" alt="Participants" class="control-icon" />
-            </button>
-            <button id="exitButton"
-                class="hidden inline-flex items-center bg-red-500 gap-0.5 rounded-md px-1.5 py-1 text-white transition-colors control-button"
-                onclick="leaveAndExit()">
-                <img src="/exit.svg" alt="Exit" class="exit-icon" />
-            </button>
-        </div>
         </div>
     </div>
 
