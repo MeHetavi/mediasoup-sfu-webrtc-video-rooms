@@ -742,6 +742,7 @@ async function checkOwnershipAndOngoing(roomId, displayName) {
   isTrainerFlag = '0'
 
   // Step 1: Check ownership (for trainers/owners)
+  let isOwner = false
   if (token) {
     const profile = await fetchProfileIfNeeded()
     const userId = extractUserId(profile)
@@ -760,13 +761,15 @@ async function checkOwnershipAndOngoing(roomId, displayName) {
         const { is_owner, is_trainer_owner, is_institute_owner } = payload || {}
         if (is_owner || is_trainer_owner || is_institute_owner) {
           isTrainerFlag = '1'
+          isOwner = true
+          // Owners/trainers can always join, even if occurrence is not ongoing
           return { allowed: true }
         }
       }
     }
   }
 
-  // Step 2: Check session status (for non-trainers or unauthenticated users)
+  // Step 2: Check session status (for non-owners)
   // This allows unauthenticated check (no token required)
   const ongoingUrl = buildApiUrl(`/session-occurrences/session/${encodeURIComponent(roomId)}/ongoing`)
   const ongoing = await safeJsonFetch(ongoingUrl, {
@@ -775,18 +778,19 @@ async function checkOwnershipAndOngoing(roomId, displayName) {
   })
 
   if (!ongoing) {
-    console.warn('Ongoing check failed; allowing join by default.')
-    return { allowed: true }
+    console.warn('Ongoing check failed; blocking join for safety.')
+    return { allowed: false, message: 'Waiting for Yogacharya to start the session.' }
   }
 
   const isOngoing = ongoing.ongoing === true || ongoing.is_ongoing === true
+  const ongoingOccurrence = ongoing.data?.ongoing_occurrence || ongoing.ongoing_occurrence
 
-  // Optionally block if session is not ongoing (currently commented out)
-  // if (!isOngoing) {
-  //   showNotification('Session not started yet.')
-  //   return { allowed: false }
-  // }
+  // If not ongoing and user is not owner, block join
+  if (!isOngoing && !ongoingOccurrence) {
+    return { allowed: false, message: 'Waiting for Yogacharya to start the session.' }
+  }
 
+  // If ongoing, allow join
   return { allowed: true }
 }
 
@@ -1286,13 +1290,19 @@ async function joinRoom(name, room_id) {
 
   // Pre-join validation with external APIs
   try {
-    const { allowed } = await checkOwnershipAndOngoing(room_id, trimmedName)
+    const { allowed, message } = await checkOwnershipAndOngoing(room_id, trimmedName)
     if (!allowed) {
+      // Show the message if provided (e.g., "Waiting for Yogacharya to start")
+      if (message) {
+        showNotification(message)
+      }
       return
     }
   } catch (e) {
     console.error('Pre-join validation failed:', e)
-    // Do not block join on API failure
+    // On API failure, block join for safety
+    showNotification('Unable to verify session status. Please try again.')
+    return
   }
 
   // Track attendance join (non-blocking)
