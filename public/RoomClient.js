@@ -778,10 +778,7 @@ class RoomClient {
     }
 
     // Allow pinning by clicking the card
-    card.style.cursor = 'pointer'
-    card.addEventListener('click', (e) => {
-      // Don't pin if clicking the pin button itself
-      if (e.target.closest('.pin-button')) return
+    card.addEventListener('click', () => {
       if (window.setPinnedCard) {
         window.setPinnedCard(card)
       }
@@ -849,10 +846,7 @@ class RoomClient {
     }
 
     // Allow pinning by clicking the card
-    card.style.cursor = 'pointer'
-    card.addEventListener('click', (e) => {
-      // Don't pin if clicking the pin button itself
-      if (e.target.closest('.pin-button')) return
+    card.addEventListener('click', () => {
       if (window.setPinnedCard) {
         window.setPinnedCard(card)
       }
