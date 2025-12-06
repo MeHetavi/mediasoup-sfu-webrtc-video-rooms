@@ -37,14 +37,32 @@ if (typeof roomidInput !== 'undefined') {
   roomidInput.value = roomFromUrl
 }
 
-const API_BASE_URL = 'https://prana.ycp.life/api/v1'
+// Parse URL parameters
+const urlParams = new URLSearchParams(window.location.search)
+const usernameFromUrl = urlParams.get('username')
+const isTrainerFromUrl = urlParams.get('isTrainer')
+
+// API Base URL - can be set via window.API_BASE_URL or config.js
+const API_BASE_URL = window.API_BASE_URL || (typeof config !== 'undefined' && config.API_BASE_URL) || 'https://prana.ycp.life/api/v1'
+const PROFILE_PIC_BASE_URL = 'https://prana.ycp.life'
 
 let authToken = null
 let currentUserProfile = null
-let currentSessionId = null
-let currentAttendanceId = null
 let currentRoomId = roomFromUrl
 let currentDisplayName = null
+// Try to restore attendance ID from sessionStorage if available
+let currentAttendanceId = null
+try {
+  const storedAttendanceId = sessionStorage.getItem('attendanceId')
+  const storedRoomId = sessionStorage.getItem('attendanceRoomId')
+  // Only restore if it's for the same room
+  if (storedAttendanceId && storedRoomId === roomFromUrl) {
+    currentAttendanceId = storedAttendanceId
+    console.log('Restored attendance ID from sessionStorage:', currentAttendanceId)
+  }
+} catch (e) {
+  console.warn('Failed to restore attendance ID from sessionStorage:', e)
+}
 let isTrainerFlag = '0'
 let rc = null
 let didAudioWarmup = false
@@ -574,10 +592,12 @@ function getAuthToken() {
   const fromUrl = params.get('token') || params.get('authToken')
   if (fromUrl) {
     localStorage.setItem('authToken', fromUrl)
+    localStorage.setItem('access_token', fromUrl) // Also store as access_token
     authToken = fromUrl
     return authToken
   }
-  const stored = localStorage.getItem('authToken')
+  // Check both localStorage keys
+  const stored = localStorage.getItem('authToken') || localStorage.getItem('access_token')
   if (stored) {
     authToken = stored
   }
@@ -630,8 +650,21 @@ async function fetchProfileIfNeeded() {
     // { success, message, data: { user_id, name, profile_pic, ... }, status_code }
     const profile = data.data || data
     currentUserProfile = profile
+    // Store in window.userProfile for external access
+    window.userProfile = profile
   }
   return currentUserProfile
+}
+
+// Helper function to construct profile picture URL
+function getProfilePicUrl(profilePic) {
+  if (!profilePic) return null
+  // If it starts with http, use as-is
+  if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
+    return profilePic
+  }
+  // Otherwise construct from base URL
+  return `${PROFILE_PIC_BASE_URL}/${profilePic.replace(/^\//, '')}`
 }
 
 async function initLobbyUserInfo() {
@@ -658,8 +691,10 @@ async function initLobbyUserInfo() {
         null
     }
 
-    if (name && typeof nameInput !== 'undefined') {
-      nameInput.value = name
+    // Use username from URL if available, otherwise use profile name
+    const displayName = usernameFromUrl || name
+    if (displayName && typeof nameInput !== 'undefined') {
+      nameInput.value = displayName
     }
 
     if (typeof lobbyUserName !== 'undefined') {
@@ -671,7 +706,9 @@ async function initLobbyUserInfo() {
     const avatarEl = typeof lobbyUserAvatar !== 'undefined' ? lobbyUserAvatar : null
     if (avatarEl) {
       if (avatarUrl) {
-        avatarEl.style.backgroundImage = `url('${avatarUrl}')`
+        // Use helper function to construct proper URL
+        const profilePicUrl = getProfilePicUrl(avatarUrl)
+        avatarEl.style.backgroundImage = `url('${profilePicUrl}')`
         avatarEl.textContent = ''
       } else {
         avatarEl.style.backgroundImage = ''
@@ -698,36 +735,13 @@ function extractUserId(profile) {
   return profile.id || profile.user_id || profile.userId || null
 }
 
-function extractSessionId(data) {
-  if (!data) return null
-  return data.session_id || data.sessionId || data.id || null
-}
 
-function buildDeviceMetadata() {
-  return {
-    userAgent: navigator.userAgent,
-    platform: navigator.platform,
-    language: navigator.language,
-    screen: {
-      width: window.screen && window.screen.width,
-      height: window.screen && window.screen.height
-    },
-    viewport: {
-      width: window.innerWidth,
-      height: window.innerHeight
-    }
-  }
-}
-
-function getDeviceName() {
-  return navigator.platform || 'web'
-}
 
 async function checkOwnershipAndOngoing(roomId, displayName) {
   const token = getAuthToken()
-  let sessionInfo = null
   isTrainerFlag = '0'
 
+  // Step 1: Check ownership (for trainers/owners)
   if (token) {
     const profile = await fetchProfileIfNeeded()
     const userId = extractUserId(profile)
@@ -746,86 +760,139 @@ async function checkOwnershipAndOngoing(roomId, displayName) {
         const { is_owner, is_trainer_owner, is_institute_owner } = payload || {}
         if (is_owner || is_trainer_owner || is_institute_owner) {
           isTrainerFlag = '1'
-          return { allowed: true, sessionInfo: null }
+          return { allowed: true }
         }
       }
     }
   }
 
-  // For non-trainers or anonymous users, check if session is ongoing
+  // Step 2: Check session status (for non-trainers or unauthenticated users)
+  // This allows unauthenticated check (no token required)
   const ongoingUrl = buildApiUrl(`/session-occurrences/session/${encodeURIComponent(roomId)}/ongoing`)
   const ongoing = await safeJsonFetch(ongoingUrl, {
     method: 'GET',
-    headers: authHeaders(true)
+    headers: authHeaders(true) // Token optional for this endpoint
   })
 
   if (!ongoing) {
     console.warn('Ongoing check failed; allowing join by default.')
-    return { allowed: true, sessionInfo: null }
+    return { allowed: true }
   }
 
   const isOngoing = ongoing.ongoing === true || ongoing.is_ongoing === true
 
+  // Optionally block if session is not ongoing (currently commented out)
   // if (!isOngoing) {
   //   showNotification('Session not started yet.')
-  //   return { allowed: false, sessionInfo: null }
+  //   return { allowed: false }
   // }
 
-  sessionInfo = ongoing
-  return { allowed: true, sessionInfo }
+  return { allowed: true }
 }
 
-async function trackJoin(sessionId, displayName) {
-  if (!sessionId) return null
+// Track attendance join
+async function trackAttendanceJoin(sessionId, displayName) {
+  if (!sessionId) {
+    console.warn('Cannot track join: sessionId is missing')
+    return null
+  }
+
+  // Ensure name is always sent, even without token
+  const name = displayName || (typeof nameInput !== 'undefined' ? nameInput.value : '') || ''
+
   const url = buildApiUrl(`/attendances/session/${encodeURIComponent(sessionId)}/join`)
   const form = new FormData()
-  form.append('name', displayName || '')
-  form.append('device_name', getDeviceName())
-  form.append('metadata', JSON.stringify(buildDeviceMetadata()))
+  form.append('name', name)
 
-  const headers = authHeaders(false)
+  console.log('Calling join API', { sessionId, name })
 
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers,
+      headers: authHeaders(false), // Don't include Content-Type, let browser set it for FormData
       body: form
     })
     if (!res.ok) {
-      console.error('Join tracking failed:', res.status, res.statusText)
+      console.error('Join attendance tracking failed:', res.status, res.statusText)
       return null
     }
     const data = await res.json().catch(() => null)
-    return data && (data.attendance_id || data.id)
+    // Extract attendance_id from the nested response structure
+    // Response format: {success: true, data: {attendance: {attendance_id: 15, ...}, ...}, ...}
+    const attendanceId = data && (
+      data.data?.attendance?.attendance_id ||  // Primary: nested in data.attendance.attendance_id
+      data.data?.attendance_id ||              // Fallback: data.attendance_id
+      data.attendance?.attendance_id ||        // Fallback: attendance.attendance_id
+      data.attendance_id ||                    // Fallback: direct attendance_id
+      data.data?.id ||                         // Fallback: data.id
+      data.id ||                               // Fallback: direct id
+      data.attendanceId ||                     // Fallback: camelCase
+      data.data?.attendanceId                   // Fallback: data.attendanceId
+    )
+    console.log('Join API response data:', { data, attendanceId, extractedFrom: data?.data?.attendance?.attendance_id ? 'data.attendance.attendance_id' : 'other' })
+
+    // Store immediately if available
+    if (attendanceId) {
+      currentAttendanceId = attendanceId
+      try {
+        sessionStorage.setItem('attendanceId', String(attendanceId))
+        console.log('Attendance ID stored from API response:', attendanceId)
+      } catch (e) {
+        console.warn('Failed to store attendance ID in sessionStorage:', e)
+      }
+    } else {
+      console.warn('Could not extract attendance_id from response:', data)
+    }
+
+    return attendanceId
   } catch (e) {
-    console.error('Join tracking request failed:', e)
+    console.error('Join attendance tracking request failed:', e)
     return null
   }
 }
 
-async function trackLeave(sessionId, displayName, attendanceId, useKeepalive = false) {
-  if (!sessionId || !attendanceId) return
+// Track attendance leave
+async function trackAttendanceLeave(sessionId, displayName, attendanceId, useKeepalive = false) {
+  if (!sessionId) {
+    console.warn('Cannot track leave: sessionId is missing', { sessionId, attendanceId })
+    return
+  }
+
+  // Ensure name is always sent, even without token
+  const name = displayName || currentDisplayName || (typeof nameInput !== 'undefined' ? nameInput.value : '') || ''
+
+  // Use attendanceId parameter, or fallback to currentAttendanceId global variable
+  const finalAttendanceId = attendanceId || currentAttendanceId
+
   const url = buildApiUrl(`/attendances/session/${encodeURIComponent(sessionId)}/leave`)
   const form = new FormData()
-  form.append('name', displayName || '')
-  form.append('attendance_id', attendanceId)
-  form.append('device_name', getDeviceName())
-  form.append('timestamp', new Date().toISOString())
-  form.append('metadata', JSON.stringify(buildDeviceMetadata()))
+  form.append('name', name)
 
-  const headers = authHeaders(false)
+  // Always include attendance_id if available
+  if (finalAttendanceId) {
+    form.append('attendance_id', finalAttendanceId)
+    console.log('Calling leave API with attendance_id', { sessionId, name, attendanceId: finalAttendanceId, useKeepalive })
+  } else {
+    console.warn('Calling leave API without attendance_id', { sessionId, name, useKeepalive })
+  }
 
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers,
+      headers: authHeaders(false), // Don't include Content-Type, let browser set it for FormData
       body: form,
       keepalive: useKeepalive
     })
+    if (!res.ok) {
+      console.error('Leave attendance tracking failed:', res.status, res.statusText)
+    } else {
+      console.log('Leave attendance tracking successful')
+    }
   } catch (e) {
-    console.error('Leave tracking request failed:', e)
+    console.error('Leave attendance tracking request failed:', e)
   }
 }
+
 
 // Initialize local media preview in the lobby
 async function initLobbyPreview() {
@@ -1219,24 +1286,38 @@ async function joinRoom(name, room_id) {
 
   // Pre-join validation with external APIs
   try {
-    const { allowed, sessionInfo } = await checkOwnershipAndOngoing(room_id, trimmedName)
+    const { allowed } = await checkOwnershipAndOngoing(room_id, trimmedName)
     if (!allowed) {
       return
-    }
-
-    const sessionId = extractSessionId(sessionInfo)
-    currentSessionId = sessionId
-
-    // Track join (non-blocking)
-    if (sessionId) {
-      trackJoin(sessionId, trimmedName).then((attendanceId) => {
-        currentAttendanceId = attendanceId
-      })
     }
   } catch (e) {
     console.error('Pre-join validation failed:', e)
     // Do not block join on API failure
   }
+
+  // Track attendance join (non-blocking)
+  // Session ID is the room ID
+  trackAttendanceJoin(room_id, trimmedName).then((attendanceId) => {
+    console.log('Join API response:', { attendanceId, room_id, name: trimmedName })
+
+    // Store attendance ID in global variable
+    if (attendanceId) {
+      currentAttendanceId = attendanceId
+
+      // Also store in sessionStorage for persistence across page reloads
+      try {
+        sessionStorage.setItem('attendanceId', String(attendanceId))
+        sessionStorage.setItem('attendanceRoomId', room_id)
+        console.log('Attendance ID stored:', attendanceId)
+      } catch (e) {
+        console.warn('Failed to store attendance ID in sessionStorage:', e)
+      }
+    } else {
+      console.warn('Join API did not return attendanceId')
+    }
+  }).catch((e) => {
+    console.error('Attendance join tracking failed:', e)
+  })
 
   // At this point, join is allowed – proceed with mediasoup client
   // Stop lobby preview stream before entering the room
@@ -1265,6 +1346,15 @@ async function joinRoom(name, room_id) {
 
   initEnumerateDevices()
 
+  // Get profile picture URL (handle relative URLs)
+  let profilePicUrl = null
+  if (currentUserProfile) {
+    const profilePic = currentUserProfile.profile_pic || currentUserProfile.avatar_url || currentUserProfile.avatar
+    if (profilePic) {
+      profilePicUrl = getProfilePicUrl(profilePic)
+    }
+  }
+
   rc = new RoomClient(
     videoGrid,
     videoGrid,
@@ -1275,8 +1365,8 @@ async function joinRoom(name, room_id) {
     trimmedName,
     roomOpen,
     {
-      isTrainer: isTrainerFlag === '1',
-      profilePic: currentUserProfile && (currentUserProfile.profile_pic || currentUserProfile.avatar_url || currentUserProfile.avatar)
+      isTrainer: isTrainerFlag === '1' || isTrainerFromUrl === '1' || isTrainerFromUrl === 'true',
+      profilePic: profilePicUrl
     }
   )
 
@@ -1287,6 +1377,17 @@ async function joinRoom(name, room_id) {
 }
 
 function roomOpen() {
+  // Dispatch browser CustomEvent for join
+  const joinEvent = new CustomEvent('roomJoin', {
+    detail: {
+      roomId: currentRoomId,
+      sessionId: currentRoomId, // session id is the room id
+      name: currentDisplayName
+    }
+  })
+  window.dispatchEvent(joinEvent)
+  console.log('Join event dispatched', joinEvent.detail)
+
   // Hide lobby elements
   if (typeof lobbyJoinCard !== 'undefined') {
     hide(lobbyJoinCard)
@@ -1367,6 +1468,29 @@ function addListeners() {
     reveal(startVideoButton)
   })
   rc.on(RoomClient.EVENTS.exitRoom, () => {
+    // Track attendance leave (non-blocking)
+    // Session ID is the room ID
+    // Call even if attendanceId is missing (API will handle it)
+    if (currentRoomId) {
+      console.log('exitRoom event triggered, calling leave API', { currentRoomId, currentAttendanceId, currentDisplayName })
+      trackAttendanceLeave(currentRoomId, currentDisplayName, currentAttendanceId, false).catch((e) => {
+        console.error('Leave attendance tracking failed:', e)
+      })
+    } else {
+      console.warn('Cannot call leave API: currentRoomId is missing')
+    }
+
+    // Dispatch browser CustomEvent for leave
+    const leaveEvent = new CustomEvent('roomLeave', {
+      detail: {
+        roomId: currentRoomId,
+        sessionId: currentRoomId, // session id is the room id
+        name: currentDisplayName
+      }
+    })
+    window.dispatchEvent(leaveEvent)
+    console.log('Leave event dispatched', leaveEvent.detail)
+
     hide(control)
     hide(participantsModal)
     hide(videoMedia)
@@ -1560,11 +1684,17 @@ async function leaveAndExit() {
 
   hide(mainVideoAreaContainer)
   reveal(lobbyContainer)
-  // Track leave (non-blocking)
-  try {
-    await trackLeave(currentSessionId, currentDisplayName, currentAttendanceId, false)
-  } catch (e) {
-    console.error('Leave tracking failed:', e)
+
+  // Track attendance leave (non-blocking)
+  // Session ID is the room ID
+  // Call even if attendanceId is missing (API will handle it)
+  if (currentRoomId) {
+    console.log('leaveAndExit called, calling leave API', { currentRoomId, currentAttendanceId, currentDisplayName })
+    trackAttendanceLeave(currentRoomId, currentDisplayName, currentAttendanceId, false).catch((e) => {
+      console.error('Leave attendance tracking failed:', e)
+    })
+  } else {
+    console.warn('Cannot call leave API: currentRoomId is missing')
   }
 
   if (rc) {
@@ -1887,6 +2017,14 @@ function closeParticipantsModal() {
   hide(participantsModal)
 }
 
+// Track leave on browser/tab close with keepalive
+window.addEventListener('beforeunload', () => {
+  if (currentRoomId) {
+    console.log('beforeunload event, calling leave API', { currentRoomId, currentAttendanceId, currentDisplayName })
+    trackAttendanceLeave(currentRoomId, currentDisplayName, currentAttendanceId, true)
+  }
+})
+
 // Simple toast-style notification using Tailwind classes
 function showNotification(message, timeout = 3000) {
   const container = document.querySelector('#toastContainer > div')
@@ -1913,7 +2051,3 @@ function showNotification(message, timeout = 3000) {
   }, timeout)
 }
 
-// Track leave on browser/tab close with keepalive
-window.addEventListener('beforeunload', () => {
-  trackLeave(currentSessionId, currentDisplayName, currentAttendanceId, true)
-})

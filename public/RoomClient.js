@@ -776,7 +776,7 @@ class RoomClient {
     if (typeof addPinButtonToCard === 'function') {
       addPinButtonToCard(card)
     }
-    
+
     // Allow pinning by clicking the card
     card.style.cursor = 'pointer'
     card.addEventListener('click', (e) => {
@@ -847,7 +847,7 @@ class RoomClient {
     if (typeof addPinButtonToCard === 'function') {
       addPinButtonToCard(card)
     }
-    
+
     // Allow pinning by clicking the card
     card.style.cursor = 'pointer'
     card.addEventListener('click', (e) => {
