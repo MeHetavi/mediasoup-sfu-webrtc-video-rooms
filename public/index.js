@@ -273,26 +273,33 @@ window.updateGridLayout = function (count) {
     'layout-pinned', 'layout-pinned-mobile', 'layout-mobile-5-6'
   )
 
-  // Handle pinned video layouts - show only pinned video, hide grid
+  // Handle pinned video layouts - show pinned video large with scrollable list of others
+  // Calculate effective count (excluding pinned card) for layout
+  const effectiveCount = hasPinned ? Math.max(0, n - 1) : n
+
   if (hasPinned) {
-    // Hide all cards in grid (they're moved to pagination or hidden)
+    // Keep all other cards visible in list (they'll be shown beside/below pinned video)
     cards.forEach(card => {
       if (card !== pinnedCard) {
-        card.style.display = 'none'
+        card.style.display = ''
+        card.style.visibility = 'visible'
+        card.style.opacity = '1'
       }
     })
 
-    // Hide the grid wrapper and show only pinned container
+    // Show both pinned container and grid wrapper
     const gridWrapper = document.getElementById('videoGridWrapper')
     if (gridWrapper) {
-      gridWrapper.style.display = 'none'
+      gridWrapper.style.display = 'flex'
     }
 
-    if (screenSize === 'mobile') {
-      grid.classList.add('layout-pinned-mobile')
-    } else {
-      grid.classList.add('layout-pinned')
-    }
+    // Add list class for pinned mode
+    grid.classList.add('pinned-list')
+
+    // Hide pagination buttons in pinned mode (scroll handles overflow)
+    hidePaginationButtons()
+
+    // Layout handled by CSS for pinned mode; skip grid layout logic
     return
   } else {
     // Show grid wrapper when not pinned
@@ -300,6 +307,7 @@ window.updateGridLayout = function (count) {
     if (gridWrapper) {
       gridWrapper.style.display = 'flex'
     }
+    grid.classList.remove('pinned-list')
   }
 
   // Auto-pin on mobile disabled - will be implemented later
@@ -312,77 +320,89 @@ window.updateGridLayout = function (count) {
   // }
 
   // Apply layout based on screen size and participant count
+  // Use effectiveCount (excludes pinned card when pinned)
+  const countForLayout = effectiveCount
   if (screenSize === 'mobile') {
     // Mobile layouts
-    if (n === 1 || n === 2) {
-      grid.classList.add(n === 1 ? 'layout-1' : 'layout-2')
+    if (countForLayout === 0) {
+      // Only pinned video, no others
       hidePaginationButtons()
-    } else if (n === 3 || n === 4) {
+    } else if (countForLayout === 1 || countForLayout === 2) {
+      grid.classList.add(countForLayout === 1 ? 'layout-1' : 'layout-2')
+      hidePaginationButtons()
+    } else if (countForLayout === 3 || countForLayout === 4) {
       grid.classList.add('layout-4')
       hidePaginationButtons()
-    } else if (n === 5 || n === 6) {
+    } else if (countForLayout === 5 || countForLayout === 6) {
       // 5-6 cameras: 3 rows, 2 cameras per row
       grid.classList.add('layout-mobile-5-6')
       hidePaginationButtons()
     } else {
       // More than 6 cameras: enable pagination (6 per page for mobile)
       grid.classList.add('layout-mobile-5-6') // Use same layout, but paginated
-      setupMobilePagination(cards, n)
+      setupMobilePagination(cards.filter(c => c !== pinnedCard), countForLayout)
     }
   } else if (screenSize === 'tablet') {
     // Tablet layouts
-    if (n === 1) {
+    if (countForLayout === 0) {
+      // Only pinned video
+    } else if (countForLayout === 1) {
       grid.classList.add('layout-1')
-    } else if (n === 2) {
+    } else if (countForLayout === 2) {
       grid.classList.add('layout-2')
-    } else if (n === 3 || n === 4) {
+    } else if (countForLayout === 3 || countForLayout === 4) {
       grid.classList.add('layout-4')
     } else {
       grid.classList.add('layout-5plus')
     }
   } else if (screenSize === 'small-desktop') {
     // Small desktop layouts
-    if (n === 1) {
+    if (countForLayout === 0) {
+      // Only pinned video
+    } else if (countForLayout === 1) {
       grid.classList.add('layout-1')
-    } else if (n === 2) {
+    } else if (countForLayout === 2) {
       grid.classList.add('layout-2')
-    } else if (n === 3) {
+    } else if (countForLayout === 3) {
       grid.classList.add('layout-3')
-    } else if (n === 4) {
+    } else if (countForLayout === 4) {
       grid.classList.add('layout-4')
     } else {
       grid.classList.add('layout-5plus')
     }
   } else {
     // Large desktop layouts - with pagination for > 12 videos
-    if (n === 1) {
+    if (countForLayout === 0) {
+      // Only pinned video
+      hidePaginationButtons()
+    } else if (countForLayout === 1) {
       grid.classList.add('layout-1')
       hidePaginationButtons()
-    } else if (n === 2) {
+    } else if (countForLayout === 2) {
       grid.classList.add('layout-2')
       hidePaginationButtons()
-    } else if (n === 3) {
+    } else if (countForLayout === 3) {
       grid.classList.add('layout-3')
       hidePaginationButtons()
-    } else if (n === 4) {
+    } else if (countForLayout === 4) {
       grid.classList.add('layout-4')
       hidePaginationButtons()
-    } else if (n === 5 || n === 6) {
-      grid.classList.add(n === 5 ? 'layout-5' : 'layout-6')
+    } else if (countForLayout === 5 || countForLayout === 6) {
+      grid.classList.add(countForLayout === 5 ? 'layout-5' : 'layout-6')
       hidePaginationButtons()
-    } else if (n === 7 || n === 8) {
-      grid.classList.add(n === 7 ? 'layout-7' : 'layout-8')
+    } else if (countForLayout === 7 || countForLayout === 8) {
+      grid.classList.add(countForLayout === 7 ? 'layout-7' : 'layout-8')
       hidePaginationButtons()
-    } else if (n === 9) {
+    } else if (countForLayout === 9) {
       grid.classList.add('layout-9')
       hidePaginationButtons()
-    } else if (n >= 10 && n <= 12) {
-      grid.classList.add(`layout-${n}`)
+    } else if (countForLayout >= 10 && countForLayout <= 12) {
+      grid.classList.add(`layout-${countForLayout}`)
       hidePaginationButtons()
     } else {
       // More than 12 videos - enable pagination
       grid.classList.add('layout-12') // Always show 12 per page
-      setupPagination(cards, n)
+      setupPagination(cards.filter(c => c !== pinnedCard), countForLayout)
     }
   }
 }
@@ -1749,6 +1769,15 @@ window.setPinnedCard = function (card) {
     pinnedCard = null
     card.classList.remove('pinned')
 
+    // Remove pinned list class/state
+    grid.classList.remove('pinned-list')
+
+    // Remove pinned state class from videoMedia
+    const videoMedia = document.getElementById('videoMedia')
+    if (videoMedia) {
+      videoMedia.classList.remove('has-pinned')
+    }
+
     // Reset pagination to first page
     currentGridPage = 0
 
@@ -1759,25 +1788,25 @@ window.setPinnedCard = function (card) {
     return
   }
 
-  // Pin: show only this card, hide others
+  // Pin: show this card large at top, keep others visible in grid below
   // Move previous pinned back to grid if exists
   if (pinnedCard && pinnedCard.parentNode === pinnedContainer) {
     grid.appendChild(pinnedCard)
     pinnedCard.classList.remove('pinned')
   }
 
-  // Hide grid wrapper
+  // Show grid wrapper so other videos remain visible
   if (gridWrapper) {
-    gridWrapper.style.display = 'none'
+    gridWrapper.style.display = 'flex'
   }
 
-  // Hide all cards in grid (they'll be restored when unpinned)
+  // Keep all other cards visible in the grid (don't hide them)
   const allCards = Array.from(grid.querySelectorAll('.video-card'))
   allCards.forEach(c => {
     if (c !== card) {
-      c.style.display = 'none'
-      c.style.visibility = 'hidden'
-      c.style.opacity = '0'
+      c.style.display = ''
+      c.style.visibility = 'visible'
+      c.style.opacity = '1'
     }
   })
 
@@ -1791,11 +1820,18 @@ window.setPinnedCard = function (card) {
   pinnedContainer.classList.remove('hidden')
   pinnedCard = card
   card.classList.add('pinned')
+  grid.classList.add('pinned-list')
 
-  // Hide pagination buttons when pinned
-  hidePaginationButtons()
+  // Add class to videoMedia to indicate pinned state for CSS
+  const videoMedia = document.getElementById('videoMedia')
+  if (videoMedia) {
+    videoMedia.classList.add('has-pinned')
+  }
 
-  // Update layout when pinning
+  // Keep pagination buttons visible for other videos
+  // Don't hide them - we want to paginate through other videos
+
+  // Update layout when pinning - this will handle pinned + grid layout
   setTimeout(() => {
     window.updateGridLayout()
   }, 100)

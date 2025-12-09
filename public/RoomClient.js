@@ -758,7 +758,7 @@ class RoomClient {
 
     const avatar = document.createElement('div')
     avatar.className =
-      'w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-lg font-semibold'
+      'w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-lg font-semibold'
     if (this.profilePic) {
       avatar.style.backgroundImage = `url('${this.profilePic}')`
       avatar.style.backgroundSize = 'cover'
@@ -825,7 +825,7 @@ class RoomClient {
 
     const avatar = document.createElement('div')
     avatar.className =
-      'w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-lg font-semibold'
+      'w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-lg font-semibold'
 
     if (profilePicUrl) {
       avatar.style.backgroundImage = `url('${profilePicUrl}')`
